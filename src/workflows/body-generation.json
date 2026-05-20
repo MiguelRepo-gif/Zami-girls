@@ -1,0 +1,224 @@
+{
+  "41": {
+    "inputs": {
+      "image": "ComfyUI_00034_.png_202605060031.jpeg"
+    },
+    "class_type": "LoadImage",
+    "_meta": {
+      "title": "Load Image"
+    }
+  },
+  "304": {
+    "inputs": {
+      "filename_prefix": "portrait-upscaled",
+      "images": [
+        "318",
+        0
+      ]
+    },
+    "class_type": "SaveImage",
+    "_meta": {
+      "title": "Save Image"
+    }
+  },
+  "318": {
+    "inputs": {
+      "samples": [
+        "333",
+        0
+      ],
+      "vae": [
+        "330",
+        0
+      ]
+    },
+    "class_type": "VAEDecode",
+    "_meta": {
+      "title": "VAE Decode"
+    }
+  },
+  "319": {
+    "inputs": {
+      "reference_latents_method": "index_timestep_zero",
+      "conditioning": [
+        "321",
+        0
+      ]
+    },
+    "class_type": "FluxKontextMultiReferenceLatentMethod",
+    "_meta": {
+      "title": "Edit Model Reference Method"
+    }
+  },
+  "320": {
+    "inputs": {
+      "reference_latents_method": "index_timestep_zero",
+      "conditioning": [
+        "323",
+        0
+      ]
+    },
+    "class_type": "FluxKontextMultiReferenceLatentMethod",
+    "_meta": {
+      "title": "Edit Model Reference Method"
+    }
+  },
+  "321": {
+    "inputs": {
+      "prompt": "Undressed woman, make completely nude, detailed nipples, detail vagina",
+      "clip": [
+        "329",
+        0
+      ],
+      "vae": [
+        "330",
+        0
+      ],
+      "image1": [
+        "41",
+        0
+      ]
+    },
+    "class_type": "TextEncodeQwenImageEditPlus",
+    "_meta": {
+      "title": "TextEncodeQwenImageEditPlus (Positive)"
+    }
+  },
+  "322": {
+    "inputs": {
+      "image": [
+        "41",
+        0
+      ]
+    },
+    "class_type": "FluxKontextImageScale",
+    "_meta": {
+      "title": "FluxKontextImageScale"
+    }
+  },
+  "323": {
+    "inputs": {
+      "prompt": "",
+      "clip": [
+        "329",
+        0
+      ],
+      "vae": [
+        "330",
+        0
+      ],
+      "image1": [
+        "41",
+        0
+      ]
+    },
+    "class_type": "TextEncodeQwenImageEditPlus",
+    "_meta": {
+      "title": "TextEncodeQwenImageEditPlus"
+    }
+  },
+  "325": {
+    "inputs": {
+      "pixels": [
+        "322",
+        0
+      ],
+      "vae": [
+        "330",
+        0
+      ]
+    },
+    "class_type": "VAEEncode",
+    "_meta": {
+      "title": "VAE Encode"
+    }
+  },
+  "327": {
+    "inputs": {
+      "lora_name": "Qwen/Qwen-Image-Edit-Unblur-Upscale_20.safetensors",
+      "strength_model": 1,
+      "model": [
+        "331",
+        0
+      ]
+    },
+    "class_type": "LoraLoaderModelOnly",
+    "_meta": {
+      "title": "Load LoRA"
+    }
+  },
+  "329": {
+    "inputs": {
+      "clip_name": "qwen_2.5_vl_7b_fp8_scaled.safetensors",
+      "type": "qwen_image",
+      "device": "default"
+    },
+    "class_type": "CLIPLoader",
+    "_meta": {
+      "title": "Load CLIP"
+    }
+  },
+  "330": {
+    "inputs": {
+      "vae_name": "qwen_image_vae.safetensors"
+    },
+    "class_type": "VAELoader",
+    "_meta": {
+      "title": "Load VAE"
+    }
+  },
+  "331": {
+    "inputs": {
+      "unet_name": "qwen_image_edit_2511_bf16.safetensors",
+      "weight_dtype": "default"
+    },
+    "class_type": "UNETLoader",
+    "_meta": {
+      "title": "Load Diffusion Model"
+    }
+  },
+  "333": {
+    "inputs": {
+      "seed": 836121815344333,
+      "steps": 12,
+      "cfg": 4,
+      "sampler_name": "euler",
+      "scheduler": "simple",
+      "denoise": 0.9,
+      "model": [
+        "334",
+        0
+      ],
+      "positive": [
+        "319",
+        0
+      ],
+      "negative": [
+        "320",
+        0
+      ],
+      "latent_image": [
+        "325",
+        0
+      ]
+    },
+    "class_type": "KSampler",
+    "_meta": {
+      "title": "KSampler"
+    }
+  },
+  "334": {
+    "inputs": {
+      "lora_name": "Qwen/SEXGOD_FemaleNudity_QwenEdit_2511_v2.safetensors",
+      "strength_model": 0.9,
+      "model": [
+        "327",
+        0
+      ]
+    },
+    "class_type": "LoraLoaderModelOnly",
+    "_meta": {
+      "title": "Load LoRA"
+    }
+  }
+}

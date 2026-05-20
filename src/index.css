@@ -1,0 +1,42 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * { box-sizing: border-box; }
+  html { font-family: 'Inter', system-ui, sans-serif; }
+  body {
+    background-color: #0D0D0D;
+    color: #ffffff;
+    margin: 0;
+    min-height: 100vh;
+  }
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: #1A1A1A; }
+  ::-webkit-scrollbar-thumb { background: #3D3D3D; border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: #E91E8C; }
+}
+
+@layer components {
+  .btn-primary {
+    @apply bg-brand-pink hover:bg-pink-600 text-white font-semibold px-5 py-2.5 rounded-lg transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed flex items-center gap-2;
+  }
+  .btn-secondary {
+    @apply bg-brand-surface hover:bg-brand-muted border border-brand-border text-white font-medium px-5 py-2.5 rounded-lg transition-all duration-200 flex items-center gap-2;
+  }
+  .card {
+    @apply bg-brand-surface border border-brand-border rounded-xl p-5;
+  }
+  .input {
+    @apply w-full bg-brand-dark border border-brand-border rounded-lg px-4 py-2.5 text-white placeholder-gray-600 focus:outline-none focus:border-brand-pink transition-colors;
+  }
+  .select {
+    @apply w-full bg-brand-dark border border-brand-border rounded-lg px-4 py-2.5 text-white focus:outline-none focus:border-brand-pink transition-colors appearance-none;
+  }
+  .label {
+    @apply block text-sm font-medium text-gray-400 mb-1.5;
+  }
+  .phase-badge {
+    @apply text-xs font-bold px-2.5 py-1 rounded-full uppercase tracking-wider;
+  }
+}

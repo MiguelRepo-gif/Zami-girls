@@ -1,0 +1,407 @@
+{
+  "2": {
+    "inputs": {
+      "unet_name": "z_image_turbo_bf16.safetensors",
+      "weight_dtype": "default"
+    },
+    "class_type": "UNETLoader",
+    "_meta": {
+      "title": "Load Diffusion Model"
+    }
+  },
+  "3": {
+    "inputs": {
+      "clip_name": "qwen_3_4b.safetensors",
+      "type": "lumina2",
+      "device": "default"
+    },
+    "class_type": "CLIPLoader",
+    "_meta": {
+      "title": "Load CLIP"
+    }
+  },
+  "4": {
+    "inputs": {
+      "vae_name": "ae.safetensors"
+    },
+    "class_type": "VAELoader",
+    "_meta": {
+      "title": "Load VAE"
+    }
+  },
+  "5": {
+    "inputs": {
+      "conditioning": [
+        "7",
+        0
+      ]
+    },
+    "class_type": "ConditioningZeroOut",
+    "_meta": {
+      "title": "ConditioningZeroOut"
+    }
+  },
+  "6": {
+    "inputs": {
+      "filename_prefix": "z-image",
+      "images": [
+        "9",
+        0
+      ]
+    },
+    "class_type": "SaveImage",
+    "_meta": {
+      "title": "Save Image"
+    }
+  },
+  "7": {
+    "inputs": {
+      "text": [
+        "82",
+        0
+      ],
+      "clip": [
+        "3",
+        0
+      ]
+    },
+    "class_type": "CLIPTextEncode",
+    "_meta": {
+      "title": "CLIP Text Encode (Prompt)"
+    }
+  },
+  "9": {
+    "inputs": {
+      "samples": [
+        "14",
+        0
+      ],
+      "vae": [
+        "4",
+        0
+      ]
+    },
+    "class_type": "VAEDecode",
+    "_meta": {
+      "title": "VAE Decode"
+    }
+  },
+  "14": {
+    "inputs": {
+      "add_noise": "enable",
+      "noise_seed": 781987691421024,
+      "steps": 8,
+      "cfg": 1,
+      "sampler_name": "euler",
+      "scheduler": "beta",
+      "start_at_step": 3,
+      "end_at_step": 10,
+      "return_with_leftover_noise": "disable",
+      "model": [
+        "17",
+        0
+      ],
+      "positive": [
+        "73",
+        0
+      ],
+      "negative": [
+        "5",
+        0
+      ],
+      "latent_image": [
+        "42",
+        0
+      ]
+    },
+    "class_type": "KSamplerAdvanced",
+    "_meta": {
+      "title": "KSampler (Advanced)"
+    }
+  },
+  "15": {
+    "inputs": {
+      "rgthree_comparer": {
+        "images": [
+          {
+            "name": "A",
+            "selected": true,
+            "url": "/api/view?filename=rgthree.compare._temp_vxrmo_00005_.png&type=temp&subfolder=&rand=0.15161431264823877"
+          },
+          {
+            "name": "B",
+            "selected": true,
+            "url": "/api/view?filename=rgthree.compare._temp_vxrmo_00006_.png&type=temp&subfolder=&rand=0.09660591746900316"
+          }
+        ]
+      },
+      "image_a": [
+        "60",
+        0
+      ],
+      "image_b": [
+        "56",
+        0
+      ]
+    },
+    "class_type": "Image Comparer (rgthree)",
+    "_meta": {
+      "title": "Image Comparer (rgthree)"
+    }
+  },
+  "17": {
+    "inputs": {
+      "shift": 3,
+      "model": [
+        "89",
+        0
+      ]
+    },
+    "class_type": "ModelSamplingAuraFlow",
+    "_meta": {
+      "title": "ModelSamplingAuraFlow"
+    }
+  },
+  "20": {
+    "inputs": {
+      "width": 1280,
+      "height": 1280,
+      "batch_size": 1
+    },
+    "class_type": "EmptySD3LatentImage",
+    "_meta": {
+      "title": "EmptySD3LatentImage"
+    }
+  },
+  "42": {
+    "inputs": {
+      "scale_method": "lanczos",
+      "scale_factor": 2,
+      "use_tiled_vae": true,
+      "samples": [
+        "78",
+        0
+      ],
+      "vae": [
+        "4",
+        0
+      ],
+      "upscale_model_opt": [
+        "62",
+        0
+      ]
+    },
+    "class_type": "LatentPixelScale",
+    "_meta": {
+      "title": "Latent Scale (on Pixel Space)"
+    }
+  },
+  "43": {
+    "inputs": {
+      "model_name": "4x-ClearRealityV1.pth"
+    },
+    "class_type": "UpscaleModelLoader",
+    "_meta": {
+      "title": "Load Upscale Model"
+    }
+  },
+  "56": {
+    "inputs": {
+      "samples": [
+        "78",
+        0
+      ],
+      "vae": [
+        "4",
+        0
+      ]
+    },
+    "class_type": "VAEDecode",
+    "_meta": {
+      "title": "VAE Decode"
+    }
+  },
+  "57": {
+    "inputs": {
+      "filename_prefix": "z-image",
+      "images": [
+        "56",
+        0
+      ]
+    },
+    "class_type": "SaveImage",
+    "_meta": {
+      "title": "Save Image"
+    }
+  },
+  "60": {
+    "inputs": {
+      "anything": [
+        "9",
+        0
+      ]
+    },
+    "class_type": "easy cleanGpuUsed",
+    "_meta": {
+      "title": "Clean VRAM Used"
+    }
+  },
+  "62": {
+    "inputs": {
+      "anything": [
+        "43",
+        0
+      ]
+    },
+    "class_type": "easy cleanGpuUsed",
+    "_meta": {
+      "title": "Clean VRAM Used"
+    }
+  },
+  "73": {
+    "inputs": {
+      "randomize_percent": 20,
+      "strength": 20,
+      "noise_insert": "noise on beginning steps",
+      "steps_switchover_percent": 5,
+      "seed": 1063858964011689,
+      "mask_starts_at": "beginning",
+      "mask_percent": 0,
+      "log_to_console": false,
+      "conditioning": [
+        "7",
+        0
+      ]
+    },
+    "class_type": "SeedVarianceEnhancer",
+    "_meta": {
+      "title": "SeedVarianceEnhancer"
+    }
+  },
+  "78": {
+    "inputs": {
+      "seed": 789383860605950,
+      "steps": 8,
+      "cfg": 1,
+      "sampler_name": "euler",
+      "scheduler": "beta",
+      "denoise": 1,
+      "model": [
+        "17",
+        0
+      ],
+      "positive": [
+        "73",
+        0
+      ],
+      "negative": [
+        "5",
+        0
+      ],
+      "latent_image": [
+        "20",
+        0
+      ]
+    },
+    "class_type": "KSampler",
+    "_meta": {
+      "title": "KSampler"
+    }
+  },
+  "82": {
+    "inputs": {
+      "gemini_api_key": "",
+      "api_key_status": "Not Verified - No key provided",
+      "photo_type": "Studio white background",
+      "brief_text": "",
+      "sex": "female",
+      "ethnicity": "East Asian",
+      "eye_shape": "hooded",
+      "eye_size": "small",
+      "eye_tilt": "slight upward tilt",
+      "eye_color": "blue-green",
+      "eyebrow_thickness": "medium thickness",
+      "eyebrow_shape": "straight",
+      "eyebrow_color": "light brown",
+      "nose_profile": "straight profile",
+      "nose_base": "narrow base",
+      "nose_tip": "rounded tip",
+      "lips_volume": "auto",
+      "cupid_bow": "pronounced cupid's bow",
+      "lips_proportion": "fuller lower lip",
+      "lips_color": "soft pink",
+      "forehead": "broad forehead",
+      "cheekbones": "high cheekbones",
+      "jawline": "strong jawline",
+      "chin": "pointed chin",
+      "cheeks": "full cheeks",
+      "submental": "tight submental area",
+      "face_neck_transition": "smooth transition",
+      "hair_structure": "straight",
+      "hair_length": "buzz cut",
+      "hair_volume": "flat and sleek",
+      "hair_color": "jet black",
+      "skin_tone": "very fair",
+      "skin_undertone": "cool undertone",
+      "skin_texture": "smooth natural grain",
+      "skin_micro_texture": "visible fine pores",
+      "skin_imperfections": "none visible",
+      "skin_reflection": "matte natural finish",
+      "wrinkles": "fine forehead lines",
+      "scars": "small facial scar",
+      "deformations": "asymmetric features",
+      "tone_loss": "none",
+      "skin_marks": "none",
+      "vitiligo": "none",
+      "under_eye": "none",
+      "expression": "happiness",
+      "expression_variant": "Duchenne smile",
+      "Verify API Key": null
+    },
+    "class_type": "AionFluxPrompterNode",
+    "_meta": {
+      "title": "AION - Portrait Master Prompter"
+    }
+  },
+  "83": {
+    "inputs": {
+      "text": "Close-up portrait, East Asian woman, small hooded blue-green eyes, slight upward tilt, straight light brown eyebrows, medium eyebrow thickness, straight nose profile, narrow base, rounded nose tip, pronounced cupid's bow, fuller lower lip, soft pink lip color, broad forehead, fine forehead lines, high cheekbones, full cheeks, strong jawline, pointed chin, asymmetric features, small facial scar, jet black buzz cut, flat sleek hair, very fair skin, cool undertone, matte natural finish, smooth natural grain, visible fine pores, Duchenne smile, happiness, plain white tank top, pure white #FFFFFF background, high-key studio lighting, even diffused light, 85mm lens, f/2.8, shallow depth of field, photorealistic, ultra-realistic, professional portrait photography, editorial style, 8K, RAW photo, sharp focus, high detail",
+      "anything": [
+        "82",
+        0
+      ]
+    },
+    "class_type": "easy showAnything",
+    "_meta": {
+      "title": "Show Any"
+    }
+  },
+  "88": {
+    "inputs": {
+      "lora_name": "Z-image/skin-texture-Photorealistic-style-v4.5.safetensors",
+      "strength_model": 0.75,
+      "model": [
+        "2",
+        0
+      ]
+    },
+    "class_type": "LoraLoaderModelOnly",
+    "_meta": {
+      "title": "Load LoRA"
+    }
+  },
+  "89": {
+    "inputs": {
+      "lora_name": "Z-image/RealisticSnapshot-Zimage-Turbov5.safetensors",
+      "strength_model": 0.6,
+      "model": [
+        "88",
+        0
+      ]
+    },
+    "class_type": "LoraLoaderModelOnly",
+    "_meta": {
+      "title": "Load LoRA"
+    }
+  }
+}
