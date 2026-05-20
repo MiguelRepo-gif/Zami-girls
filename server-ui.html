@@ -531,38 +531,15 @@ async function pollForImage(runId, stepNum) {
 
 // ── Persona rendering (same logic as v1) ────────────────
 
-function parsePersona(text) {
-  const sections = []
-  let current = null
-  for (const raw of text.split('\n')) {
-    const line = raw.trim()
-    if (!line) continue
-    const isHeader = /^[💎📛📏🌍🐾🍣🎵🎬💫📲🔥🧷🖋️🧠]/.test(line) && !line.includes(':')
-    if (isHeader) {
-      current = { title: line.replace(/\*\*/g,''), fields: [] }
-      sections.push(current)
-    } else if (current && line.includes(':')) {
-      const ci = line.indexOf(':')
-      const key = line.slice(0, ci).replace(/\*\*/g,'').trim()
-      const val = line.slice(ci + 1).replace(/\*\*/g,'').trim()
-      current.fields.push({ key, val, sub: false })
-    } else if (current && /^\s*-/.test(raw)) {
-      const val = line.replace(/^-\s*/, '').replace(/\*\*/g,'').trim()
-      current.fields.push({ key: '', val, sub: true })
-    }
-  }
-  return sections
-}
+function renderPersona(data, nombre, nicho) {
+  const sections   = data.sections || []
+  const aliasS     = sections.find(s => /Alias/i.test(s.title)) || {}
+  const aliasField = k => (aliasS.fields || []).find(f => new RegExp(k,'i').test(f.label || ''))?.value || ''
 
-function renderPersona(text, nombre, nicho) {
-  const sections = parsePersona(text)
-  const aliasS   = sections.find(s => /Alias/i.test(s.title)) || {}
-  const aliasF   = k => (aliasS.fields || []).find(f => new RegExp(k,'i').test(f.key))?.val || ''
-
-  const stageName = aliasF('Stage|Nombre artístico') || nombre
-  const handle    = aliasF('Handle|Usuario')
-  const edad      = aliasF('Edad|Age')
-  const signo     = aliasF('Signo|Zodiac')
+  const stageName = aliasField('Stage') || nombre
+  const handle    = aliasField('Handle|Usuario')
+  const edad      = aliasField('Edad')
+  const signo     = aliasField('Signo')
 
   let html = `<div class="profile-card"><div class="profile-hero">`
   if (generatedFaceUrl || generatedBodyUrl) {
@@ -578,22 +555,20 @@ function renderPersona(text, nombre, nicho) {
     <div class="profile-niche">${escHtml(nicho)}</div>
   </div></div>`
 
-  const sectionCount = sections.filter(s => !/TEMPLATE|💎/.test(s.title) && s.fields.length).length
+  const validSections = sections.filter(s => s.fields && s.fields.length)
   html += `<button class="btn-expand open" onclick="toggleSections(this)">
-    <span class="arrow">▲</span> Ver perfil completo (${sectionCount} secciones) &nbsp;·&nbsp; ✏️ cada campo es editable
+    <span class="arrow">▲</span> Ver perfil completo (${validSections.length} secciones) &nbsp;·&nbsp; ✏️ cada campo es editable
   </button>`
   html += `<div class="profile-sections" id="profile-sections-grid">`
-  for (const sec of sections) {
-    if (/TEMPLATE|💎/.test(sec.title)) continue
-    if (!sec.fields.length) continue
+  for (const sec of validSections) {
     html += `<div class="profile-section"><div class="section-title">${escHtml(sec.title)}</div>`
     for (const f of sec.fields) {
       if (f.sub) {
-        html += `<div class="profile-field"><span class="field-value sub" contenteditable="true">${escHtml(f.val)}</span></div>`
+        html += `<div class="profile-field"><span class="field-value sub" contenteditable="true">${escHtml(f.value || '')}</span></div>`
       } else {
         html += `<div class="profile-field">
-          <span class="field-label">${escHtml(f.key)}</span>
-          <span class="field-value" contenteditable="true">${escHtml(f.val)}</span>
+          <span class="field-label">${escHtml(f.label || '')}</span>
+          <span class="field-value" contenteditable="true">${escHtml(f.value || '')}</span>
         </div>`
       }
     }

@@ -85,95 +85,24 @@ async function generatePersona(nombre, nicho, faceUrl, bodyUrl) {
   const content = []
   if (faceUrl) content.push({ type: 'image', source: { type: 'url', url: faceUrl } })
   if (bodyUrl) content.push({ type: 'image', source: { type: 'url', url: bodyUrl } })
-  content.push({ type: 'text', text: `Eres un experto en crear perfiles de influencers virtuales para redes sociales y contenido digital.
+  content.push({ type: 'text', text: `Eres un experto en crear perfiles de influencers virtuales latinas para redes sociales.
 
 Datos del personaje:
 - Nombre artístico: ${nombre}
 - Nicho de contenido: ${nicho}
 
-${faceUrl ? 'Te adjunto la imagen del ROSTRO — úsala para describir con precisión: color de ojos, tono de piel, color y estilo de cabello, rasgos distintivos (lunares, pecas, etc.).' : ''}
-${bodyUrl ? 'Te adjunto la imagen del CUERPO — úsala para describir: altura estimada, constitución física y cualquier rasgo visible.' : ''}
+${faceUrl ? 'Imagen del ROSTRO adjunta — úsala para describir con precisión: color de ojos, tono de piel, color y estilo de cabello, rasgos distintivos (lunares, pecas, etc.).' : ''}
+${bodyUrl ? 'Imagen del CUERPO adjunta — úsala para describir: altura estimada, constitución física y rasgos visibles.' : ''}
 
-Llena CADA campo de forma creativa, específica y coherente con el nicho y las imágenes. Hazla carismática, única y atractiva. Responde TODO en español. Escribe SOLO el template llenado, sin comentarios adicionales.
+Devuelve EXCLUSIVAMENTE el siguiente objeto JSON con todos los campos completados. Sin markdown, sin bloques de código, sin texto antes o después. Solo el JSON.
 
-💎 AI PERSONA TEMPLATE 💋
+Reemplaza cada "..." con valores creativos, específicos y coherentes con el nicho "${nicho}" y las imágenes adjuntas. Todo en español.
 
-📛 Alias
-Stage Name: ${nombre}
-Nombre Real: ___
-Usuario/Handle: @___
-Apodos: ___
-Edad: ___
-Cumpleaños: ___
-Signo Zodiacal: ___
-
-📏 Físico & Apariencia
-Altura: ___
-Talla de zapatos: ___
-Color/Estilo de cabello: ___
-Color de ojos: ___
-Tono de piel: ___
-Rasgos Distintivos (lunares, pecas, etc.): ___
-
-🌍 Origen & Ubicación
-Etnicidad: ___
-Ciudad natal (lo que creen los fans): ___
-Ubicación actual (lo que asumen los fans): ___
-Cómo la conocieron los fans (momentos virales, rumores): ___
-
-🐾 Estilo de Vida
-Mascotas (nombre + tipo): ___
-Trabajo (si aplica): ___
-Familia (público o privado): ___
-
-🍣 Favoritos & Antojos
-Comida favorita: ___
-Restaurante favorito: ___
-Trago/Bebida favorita: ___
-Comida trampa: ___
-
-🎵 Vibe Musical
-Géneros musicales: ___
-Artistas favoritos: ___
-Canción de cabecera: ___
-
-🎬 Entretenimiento
-Géneros favoritos de películas/series: ___
-Series o películas top: ___
-Lo que ve para relajarse: ___
-
-💫 Hobbies & Hábitos
-(lista 3–5): ___
-Talento secreto: ___
-
-📲 Huella Digital
-Emojis más usados: ___
-Frases típicas en mensajes:
- - "___"
- - "___"
- - "___"
-Estilo al escribir (argot, coqueta, formal, reina de los audios, etc.): ___
-
-🔥 Persona de Contenido
-Nicho: ${nicho}
-Estilo de representación (glam, chica de al lado, dominante, etc.): ___
-Temas recurrentes: ___
-Lo que más les gusta a sus fans: ___
-
-🖋️ Modificaciones Corporales
-Tatuajes: ___
-Piercings: ___
-Cicatrices/Marcas de nacimiento: ___
-
-🧠 Personalidad
-3 Palabras que la describen: ___ ___ ___
-Nivel de coqueteo: 😇 Bajo / 😏 Medio / 😈 Alto
-Arquetipo (ej. femme fatale, chica de al lado, CEO baddie): ___
-Fantasía principal que encarna para sus fans: ___` })
+{"sections":[{"title":"📛 Alias","fields":[{"label":"Stage Name","value":"${nombre}"},{"label":"Nombre Real","value":"..."},{"label":"Usuario/Handle","value":"@..."},{"label":"Apodos","value":"..."},{"label":"Edad","value":"..."},{"label":"Cumpleaños","value":"..."},{"label":"Signo Zodiacal","value":"..."}]},{"title":"📏 Físico & Apariencia","fields":[{"label":"Altura","value":"..."},{"label":"Talla de zapatos","value":"..."},{"label":"Color/Estilo de cabello","value":"..."},{"label":"Color de ojos","value":"..."},{"label":"Tono de piel","value":"..."},{"label":"Rasgos Distintivos","value":"..."}]},{"title":"🌍 Origen & Ubicación","fields":[{"label":"Etnicidad","value":"..."},{"label":"Ciudad natal","value":"..."},{"label":"Ubicación actual","value":"..."},{"label":"Cómo la conocieron los fans","value":"..."}]},{"title":"🐾 Estilo de Vida","fields":[{"label":"Mascotas","value":"..."},{"label":"Trabajo","value":"..."},{"label":"Familia","value":"..."}]},{"title":"🍣 Favoritos & Antojos","fields":[{"label":"Comida favorita","value":"..."},{"label":"Restaurante favorito","value":"..."},{"label":"Trago/Bebida favorita","value":"..."},{"label":"Comida trampa","value":"..."}]},{"title":"🎵 Vibe Musical","fields":[{"label":"Géneros musicales","value":"..."},{"label":"Artistas favoritos","value":"..."},{"label":"Canción de cabecera","value":"..."}]},{"title":"🎬 Entretenimiento","fields":[{"label":"Géneros favoritos","value":"..."},{"label":"Series o películas top","value":"..."},{"label":"Lo que ve para relajarse","value":"..."}]},{"title":"💫 Hobbies & Hábitos","fields":[{"label":"","value":"...","sub":true},{"label":"","value":"...","sub":true},{"label":"","value":"...","sub":true},{"label":"Talento secreto","value":"..."}]},{"title":"📲 Huella Digital","fields":[{"label":"Emojis más usados","value":"..."},{"label":"","value":"...","sub":true},{"label":"","value":"...","sub":true},{"label":"","value":"...","sub":true},{"label":"Estilo al escribir","value":"..."}]},{"title":"🔥 Persona de Contenido","fields":[{"label":"Nicho","value":"${nicho}"},{"label":"Estilo de representación","value":"..."},{"label":"Temas recurrentes","value":"..."},{"label":"Lo que más les gusta a sus fans","value":"..."}]},{"title":"🖋️ Modificaciones Corporales","fields":[{"label":"Tatuajes","value":"..."},{"label":"Piercings","value":"..."},{"label":"Cicatrices/Marcas de nacimiento","value":"..."}]},{"title":"🧠 Personalidad","fields":[{"label":"3 Palabras que la describen","value":"..."},{"label":"Nivel de coqueteo","value":"..."},{"label":"Arquetipo","value":"..."},{"label":"Fantasía principal","value":"..."}]}]}` })
 
   const payload = JSON.stringify({
     model: 'claude-sonnet-4-6',
-    max_tokens: 4000,
+    max_tokens: 6000,
     messages: [{ role: 'user', content }],
   })
 
@@ -196,7 +125,11 @@ Fantasía principal que encarna para sus fans: ___` })
         try {
           const data = JSON.parse(raw)
           if (res.statusCode !== 200) throw new Error(`Anthropic ${res.statusCode}: ${JSON.stringify(data)}`)
-          resolve(data.content[0].text)
+          let text = data.content[0].text.trim()
+          // Extraer JSON aunque Claude lo envuelva en bloque markdown
+          const match = text.match(/\{[\s\S]*\}/)
+          if (match) text = match[0]
+          resolve(JSON.parse(text))
         } catch (e) { reject(e) }
       })
     })
@@ -415,7 +348,7 @@ const server = http.createServer(async (req, res) => {
       console.log(`\n[GENERATE-PERSONA] nombre="${nombre}" nicho="${nicho}" face=${!!faceUrl} body=${!!bodyUrl}`)
 
       const persona = await generatePersona(nombre, nicho, faceUrl, bodyUrl)
-      console.log(`  persona generada (${persona.length} chars)`)
+      console.log(`  persona generada (${persona.sections?.length || 0} secciones)`)
 
       json(res, 200, { persona })
     } catch (err) {
