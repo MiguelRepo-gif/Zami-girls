@@ -206,6 +206,81 @@ Fantasía principal que encarna para sus fans: ___` })
   })
 }
 
+// ── Generador de prompts para ComfyDeploy — Nano Banana Pro ──────────────────
+
+async function generatePrompt(nombre, nicho, tipo, faceDescription) {
+  let promptText
+  if (tipo === 'face') {
+    promptText = `You are an expert prompt engineer for Nano Banana Pro, a high-fidelity AI image generator.
+Create an ultra-detailed, hyperdescriptive prompt in English to generate the face of a virtual latina influencer named ${nombre} whose content niche is ${nicho}.
+
+The prompt MUST include ALL of the following with maximum specificity:
+- Ethnicity and regional origin (e.g., "Colombian-Italian heritage")
+- Exact skin tone (e.g., "warm honey-olive complexion, NC30")
+- Eye color, shape, and details (e.g., "almond-shaped deep amber eyes with long curled lashes")
+- Hair: color, texture, length, style (e.g., "long wavy dark chestnut brown hair with caramel highlights")
+- Facial structure (e.g., "soft oval face, high cheekbones, defined jaw, small upturned nose")
+- Lips (e.g., "full cupid's bow lips, natural rose-pink")
+- Distinctive features (e.g., "subtle dimples, light freckles across nose bridge")
+- Expression (e.g., "confident smiling expression, direct eye contact")
+- Lighting (e.g., "cinematic golden hour rim light, soft key light")
+- Camera/quality tags (e.g., "portrait photography, 85mm lens, shallow depth of field, 8k, photorealistic, hyperdetailed skin texture")
+
+Output ONLY the prompt text. No explanations, no quotes, no labels.`
+  } else {
+    promptText = `You are an expert prompt engineer for Nano Banana Pro, a high-fidelity AI image generator.
+Create an ultra-detailed, hyperdescriptive prompt in English to generate the full body of a virtual latina influencer named ${nombre} whose content niche is ${nicho}.
+
+Face reference already generated: ${faceDescription}
+
+The prompt MUST include ALL of the following with maximum specificity:
+- Physical build consistent with the niche (e.g., "athletic toned physique with curves" for fitness; "slim petite frame" for fashion)
+- Exact outfit typical of her niche (e.g., "high-waist sports leggings, cropped sports bra, Nike sneakers" for fitness)
+- Accessories and styling details (e.g., "gold hoop earrings, minimal makeup, slicked-back ponytail")
+- Pose (e.g., "standing three-quarter view, hand on hip, confident stance")
+- Setting/background (e.g., "modern home gym with ring light visible in background")
+- Lighting (e.g., "soft studio lighting, slight warm gradient")
+- Consistency cue: same face as described in the face reference above
+- Quality tags (e.g., "full body shot, fashion photography, 35mm lens, 8k, photorealistic, hyperdetailed fabric texture")
+
+Output ONLY the prompt text. No explanations, no quotes, no labels.`
+  }
+
+  const payload = JSON.stringify({
+    model: 'claude-sonnet-4-6',
+    max_tokens: 500,
+    messages: [{ role: 'user', content: promptText }],
+  })
+
+  return new Promise((resolve, reject) => {
+    const opts = {
+      hostname: 'api.anthropic.com',
+      path: '/v1/messages',
+      method: 'POST',
+      headers: {
+        'x-api-key':         ANTHROPIC_KEY,
+        'anthropic-version': '2023-06-01',
+        'content-type':      'application/json',
+        'content-length':    Buffer.byteLength(payload),
+      },
+    }
+    const req = https.request(opts, res => {
+      let raw = ''
+      res.on('data', d => raw += d)
+      res.on('end', () => {
+        try {
+          const data = JSON.parse(raw)
+          if (res.statusCode !== 200) throw new Error(`Anthropic ${res.statusCode}: ${JSON.stringify(data)}`)
+          resolve(data.content[0].text.trim())
+        } catch (e) { reject(e) }
+      })
+    })
+    req.on('error', reject)
+    req.write(payload)
+    req.end()
+  })
+}
+
 async function getRun(runId) {
   const res = await cdRequest('GET', `/api/run/${runId}`)
   if (res.status !== 200) throw new Error(`Poll ${res.status}`)
@@ -345,6 +420,32 @@ const server = http.createServer(async (req, res) => {
       json(res, 200, { persona })
     } catch (err) {
       console.error('[GENERATE-PERSONA ERROR]', err.message)
+      json(res, 500, { error: err.message })
+    }
+    return
+  }
+
+  // POST /api/generate-prompt
+  if (req.method === 'POST' && pathname === '/api/generate-prompt') {
+    try {
+      const body            = await readBody(req)
+      const nombre          = (body.nombre || '').trim()
+      const nicho           = (body.nicho  || '').trim()
+      const tipo            = (body.tipo   || 'face').trim()
+      const faceDescription = (body.face_description || '').trim()
+
+      if (!nombre) { json(res, 400, { error: 'nombre requerido' }); return }
+      if (!nicho)  { json(res, 400, { error: 'nicho requerido' }); return }
+      if (!ANTHROPIC_KEY) { json(res, 500, { error: 'Agrega ANTHROPIC_API_KEY en tu .env' }); return }
+
+      console.log(`\n[GENERATE-PROMPT] tipo="${tipo}" nombre="${nombre}" nicho="${nicho}"`)
+
+      const prompt = await generatePrompt(nombre, nicho, tipo, faceDescription)
+      console.log(`  prompt generado (${prompt.length} chars): ${prompt.slice(0, 80)}...`)
+
+      json(res, 200, { prompt })
+    } catch (err) {
+      console.error('[GENERATE-PROMPT ERROR]', err.message)
       json(res, 500, { error: err.message })
     }
     return

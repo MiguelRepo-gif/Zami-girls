@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Zami — Generador de Influencers</title>
+<title>Zami — Generador de Influencers v2</title>
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0 }
   body {
@@ -25,36 +25,7 @@
     margin-bottom: 24px;
   }
   label { display: block; font-size: 0.78rem; font-weight: 600; color: #888; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.05em }
-  textarea {
-    width: 100%;
-    background: #0d0d0d;
-    border: 1px solid #2a2a2a;
-    border-radius: 10px;
-    color: #e8e8e8;
-    font-size: 0.9rem;
-    padding: 12px 14px;
-    resize: vertical;
-    min-height: 90px;
-    font-family: inherit;
-    outline: none;
-    transition: border-color .15s;
-  }
-  textarea:focus { border-color: #e85d8a }
   .row { display: flex; gap: 12px; margin-top: 14px; align-items: flex-end }
-  .field-qty { flex: 0 0 110px }
-  input[type=number] {
-    width: 100%;
-    background: #0d0d0d;
-    border: 1px solid #2a2a2a;
-    border-radius: 10px;
-    color: #e8e8e8;
-    font-size: 0.9rem;
-    padding: 11px 14px;
-    font-family: inherit;
-    outline: none;
-    transition: border-color .15s;
-  }
-  input[type=number]:focus { border-color: #e85d8a }
   button {
     flex: 1;
     padding: 11px 20px;
@@ -69,143 +40,6 @@
   }
   button:hover:not(:disabled) { background: #d94c79 }
   button:disabled { opacity: .45; cursor: not-allowed }
-
-  .status-bar {
-    font-size: 0.82rem;
-    color: #888;
-    margin-bottom: 20px;
-    min-height: 1.2em;
-  }
-  .status-bar.error { color: #f87171 }
-  .status-bar.success { color: #4ade80 }
-
-  .grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-    gap: 14px;
-  }
-  .card {
-    background: #161616;
-    border: 2px solid #2a2a2a;
-    border-radius: 14px;
-    aspect-ratio: 1;
-    overflow: hidden;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    position: relative;
-  }
-  .card.generating { border-color: #e85d8a44 }
-  .card.done       { border-color: #2a2a2a; cursor: pointer }
-  .card.done:hover { border-color: #e85d8a88 }
-  .card img { width: 100%; height: 100%; object-fit: cover; display: block }
-  .card .placeholder {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 10px;
-    color: #444;
-    font-size: 0.8rem;
-  }
-  .spinner {
-    width: 28px; height: 28px;
-    border: 2px solid #2a2a2a;
-    border-top-color: #e85d8a;
-    border-radius: 50%;
-    animation: spin .8s linear infinite;
-  }
-  @keyframes spin { to { transform: rotate(360deg) } }
-  .card-label {
-    position: absolute;
-    bottom: 8px; left: 10px;
-    background: rgba(0,0,0,.6);
-    color: #fff;
-    font-size: 0.72rem;
-    font-weight: 600;
-    padding: 2px 8px;
-    border-radius: 20px;
-  }
-  .phase-header {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    margin: 36px 0 16px;
-  }
-  .phase-header h2 {
-    font-size: 1.05rem;
-    font-weight: 700;
-    color: #fff;
-  }
-  .phase-badge {
-    background: #e85d8a22;
-    border: 1px solid #e85d8a44;
-    color: #e85d8a;
-    font-size: 0.7rem;
-    font-weight: 700;
-    padding: 2px 10px;
-    border-radius: 20px;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-  }
-  .btn-select {
-    position: absolute;
-    bottom: 8px; right: 8px;
-    padding: 5px 12px;
-    background: #e85d8a;
-    border: none;
-    border-radius: 8px;
-    color: #fff;
-    font-size: 0.72rem;
-    font-weight: 700;
-    cursor: pointer;
-    z-index: 2;
-    transition: background .15s;
-    flex: unset;
-  }
-  .btn-select:hover { background: #d94c79 }
-  .btn-select.selected {
-    background: #4ade80;
-    color: #000;
-  }
-  .face-preview {
-    display: flex;
-    align-items: center;
-    gap: 14px;
-    background: #0d0d0d;
-    border: 1px solid #2a2a2a;
-    border-radius: 10px;
-    padding: 10px 14px;
-    margin-bottom: 14px;
-  }
-  .face-preview img {
-    width: 64px;
-    height: 64px;
-    object-fit: cover;
-    border-radius: 8px;
-    border: 2px solid #4ade80;
-  }
-  .face-preview .face-placeholder {
-    width: 64px;
-    height: 64px;
-    border-radius: 8px;
-    border: 2px dashed #333;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: #444;
-    font-size: 0.75rem;
-    text-align: center;
-    flex-shrink: 0;
-  }
-  .face-preview-info {
-    font-size: 0.8rem;
-    color: #888;
-  }
-  .face-preview-info strong {
-    display: block;
-    color: #ccc;
-    margin-bottom: 2px;
-  }
   input[type=text] {
     width: 100%;
     background: #0d0d0d;
@@ -220,36 +54,99 @@
   }
   input[type=text]:focus { border-color: #e85d8a }
   .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 14px }
-  .persona-images {
-    display: flex;
-    gap: 12px;
-    background: #0d0d0d;
+
+  /* ── Progress Steps ─────────────────────────────────── */
+  .steps {
+    background: #161616;
     border: 1px solid #2a2a2a;
-    border-radius: 10px;
-    padding: 10px 14px;
-    margin-bottom: 14px;
-    align-items: center;
+    border-radius: 14px;
+    padding: 4px 20px;
+    margin-bottom: 24px;
   }
-  .persona-thumb {
+  .step {
     display: flex;
-    flex-direction: column;
+    align-items: flex-start;
+    gap: 14px;
+    padding: 14px 0;
+    border-bottom: 1px solid #1a1a1a;
+  }
+  .step:last-child { border-bottom: none }
+  .step-dot {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    border: 2px solid #2a2a2a;
+    display: flex;
     align-items: center;
-    gap: 4px;
+    justify-content: center;
+    flex-shrink: 0;
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: #444;
+    margin-top: 1px;
   }
-  .persona-thumb img {
-    width: 72px; height: 72px;
-    object-fit: cover;
-    border-radius: 8px;
-    border: 2px solid #4ade80;
+  .step.active .step-dot {
+    border-color: #e85d8a;
+    color: #e85d8a;
+    animation: pulse 1.2s ease-in-out infinite;
   }
-  .persona-thumb .thumb-empty {
-    width: 72px; height: 72px;
-    border-radius: 8px;
-    border: 2px dashed #333;
-    display: flex; align-items: center; justify-content: center;
-    color: #444; font-size: 0.7rem; text-align: center;
+  .step.done .step-dot { border-color: #4ade80; background: #4ade8020; color: #4ade80 }
+  .step.error .step-dot { border-color: #f87171; background: #f8717120; color: #f87171 }
+  @keyframes pulse { 0%, 100% { opacity: 1 } 50% { opacity: 0.4 } }
+  .step-content { flex: 1; min-width: 0 }
+  .step-title { font-size: 0.88rem; font-weight: 600; color: #555 }
+  .step.active .step-title { color: #fff }
+  .step.done .step-title { color: #4ade80 }
+  .step.error .step-title { color: #f87171 }
+  .step-detail {
+    font-size: 0.75rem;
+    color: #444;
+    margin-top: 4px;
+    line-height: 1.5;
+    word-break: break-word;
+    overflow: hidden;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
   }
-  .persona-thumb span { font-size: 0.7rem; color: #666; }
+  .step.active .step-detail { color: #666 }
+  .step.done .step-detail { color: #555 }
+
+  /* ── Result Images ──────────────────────────────────── */
+  .result-images {
+    display: flex;
+    gap: 14px;
+    margin-bottom: 24px;
+  }
+  .result-img-wrap {
+    flex: 1;
+    background: #161616;
+    border: 1px solid #2a2a2a;
+    border-radius: 14px;
+    overflow: hidden;
+  }
+  .result-img-label {
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: #555;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    padding: 10px 14px 6px;
+  }
+  .result-img-wrap img {
+    width: 100%;
+    display: block;
+    cursor: zoom-in;
+  }
+  .result-img-placeholder {
+    aspect-ratio: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #333;
+    font-size: 0.8rem;
+  }
+
   /* ── Profile Card ───────────────────────────────────── */
   .profile-card {
     background: #161616;
@@ -289,15 +186,8 @@
     color: #fff;
     margin: 0;
   }
-  .profile-handle {
-    font-size: 0.95rem;
-    color: #e85d8a;
-    font-weight: 600;
-  }
-  .profile-meta {
-    font-size: 0.82rem;
-    color: #666;
-  }
+  .profile-handle { font-size: 0.95rem; color: #e85d8a; font-weight: 600 }
+  .profile-meta { font-size: 0.82rem; color: #666 }
   .profile-niche {
     display: inline-block;
     background: #e85d8a22;
@@ -319,10 +209,7 @@
     background: #222;
     border-top: 1px solid #222;
   }
-  .profile-section {
-    background: #161616;
-    padding: 18px 20px;
-  }
+  .profile-section { background: #161616; padding: 18px 20px }
   .section-title {
     font-size: 0.78rem;
     font-weight: 700;
@@ -333,11 +220,7 @@
     padding-bottom: 8px;
     border-bottom: 1px solid #2a2a2a;
   }
-  .profile-field {
-    display: flex;
-    flex-direction: column;
-    margin-bottom: 10px;
-  }
+  .profile-field { display: flex; flex-direction: column; margin-bottom: 10px }
   .field-label {
     font-size: 0.68rem;
     font-weight: 700;
@@ -359,410 +242,272 @@
     word-break: break-word;
   }
   .field-value:hover { background: #1e1e1e }
-  .field-value:focus {
-    background: #1a1a1a;
-    color: #fff;
-    box-shadow: 0 0 0 1px #e85d8a44;
-  }
+  .field-value:focus { background: #1a1a1a; color: #fff; box-shadow: 0 0 0 1px #e85d8a44 }
   .field-value.sub { color: #aaa; padding-left: 12px }
-  .edit-hint {
-    font-size: 0.7rem;
-    color: #444;
-    text-align: right;
-    padding: 8px 20px 4px;
-  }
+  .edit-hint { font-size: 0.7rem; color: #444; text-align: right; padding: 8px 20px 4px }
   .btn-copy {
-    margin-top: 12px;
     flex: unset;
     padding: 9px 20px;
     background: #2a2a2a;
     font-size: 0.82rem;
+    margin-top: 12px;
   }
   .btn-copy:hover:not(:disabled) { background: #3a3a3a }
-  .deployment-id {
-    font-size: 0.72rem;
-    color: #333;
-    margin-top: 28px;
-    text-align: center;
+  .deployment-id { font-size: 0.72rem; color: #333; margin-top: 28px; text-align: center }
+  .badge-v2 {
+    display: inline-block;
+    background: #e85d8a22;
+    border: 1px solid #e85d8a44;
+    color: #e85d8a;
+    font-size: 0.65rem;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 20px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    vertical-align: middle;
+    margin-left: 8px;
   }
 </style>
 </head>
 <body>
 <div class="container">
-  <h1>Zami AI Studio</h1>
-  <p class="subtitle">Pipeline de generación de influencers virtuales</p>
+  <h1>Zami AI Studio <span class="badge-v2">v2 Auto</span></h1>
+  <p class="subtitle">Escribe el nombre y el nicho — la IA genera todo automáticamente</p>
 
-  <div class="phase-header">
-    <span class="phase-badge">Fase 1</span>
-    <h2>Generación de Rostro</h2>
-  </div>
-
+  <!-- Form -->
   <div class="controls">
-    <label for="prompt">Descripción del personaje</label>
-    <textarea id="prompt" placeholder="Ej: latina joven, rasgos suaves, ojos café oscuros, cabello largo negro, fondo blanco studio, iluminación profesional..."></textarea>
-    <div class="row">
-      <div class="field-qty">
-        <label for="count">Cantidad</label>
-        <input type="number" id="count" value="1" min="1" max="4">
-      </div>
-      <button id="btn-generate" onclick="generate()">Generar</button>
-    </div>
-  </div>
-
-  <div class="status-bar" id="status">Listo.</div>
-  <div class="grid" id="grid"></div>
-
-
-  <!-- FASE 2 -->
-  <div class="phase-header">
-    <span class="phase-badge">Fase 2</span>
-    <h2>Generación de Cuerpo</h2>
-  </div>
-
-  <div class="controls">
-    <div class="face-preview" id="face-preview">
-      <div class="face-placeholder" id="face-placeholder">Sin<br>rostro</div>
-      <img id="face-preview-img" src="" alt="" style="display:none">
-      <div class="face-preview-info">
-        <strong id="face-preview-label">Ningún rostro seleccionado</strong>
-        Selecciona una imagen de la Fase 1 para usarla como base del cuerpo.
-      </div>
-    </div>
-    <label for="body-prompt">Descripción del cuerpo</label>
-    <textarea id="body-prompt" placeholder="Ej: cuerpo curvy, atuendo casual, fondo blanco studio..."></textarea>
-    <div class="row" style="margin-top:14px">
-      <button id="btn-generate-body" onclick="generateBody()" disabled>Generar cuerpo</button>
-    </div>
-  </div>
-
-  <div class="status-bar" id="body-status">Selecciona un rostro de la Fase 1 para comenzar.</div>
-  <div class="grid" id="body-grid"></div>
-
-  <!-- FASE 3 -->
-  <div class="phase-header">
-    <span class="phase-badge">Fase 3</span>
-    <h2>Creación de Perfil — AI Persona</h2>
-  </div>
-
-  <div class="controls">
-    <div class="persona-images">
-      <div class="persona-thumb">
-        <div class="thumb-empty" id="p3-face-empty">Sin<br>rostro</div>
-        <img id="p3-face-img" src="" alt="" style="display:none">
-        <span id="p3-face-label">Rostro</span>
-      </div>
-      <div class="persona-thumb">
-        <div class="thumb-empty" id="p3-body-empty">Sin<br>cuerpo</div>
-        <img id="p3-body-img" src="" alt="" style="display:none">
-        <span id="p3-body-label">Cuerpo</span>
-      </div>
-      <div style="font-size:0.8rem;color:#666;margin-left:4px">
-        Selecciona el rostro (Fase 1) y el cuerpo (Fase 2) antes de generar.
-      </div>
-    </div>
     <div class="two-col">
       <div>
-        <label for="p3-nombre">Nombre de la influencer</label>
-        <input type="text" id="p3-nombre" placeholder="Ej: Valentina Cruz">
+        <label for="nombre">Nombre de la influencer</label>
+        <input type="text" id="nombre" placeholder="Ej: Valentina, Carla, Sofia...">
       </div>
       <div>
-        <label for="p3-nicho">Nicho de contenido</label>
-        <input type="text" id="p3-nicho" placeholder="Ej: Fitness & Lifestyle, NSFW, Latina Glamour...">
+        <label for="nicho">Nicho de contenido</label>
+        <input type="text" id="nicho" placeholder="Ej: Fitness, Gamer, Moda, Lifestyle...">
       </div>
     </div>
     <div class="row" style="margin-top:0">
-      <button id="btn-generate-persona" onclick="generatePersona()" disabled>Generar Perfil</button>
+      <button id="btn-main" onclick="generateAll()">▶ Generar influencer completa</button>
     </div>
   </div>
 
-  <div class="status-bar" id="persona-status">Selecciona rostro y cuerpo para activar esta fase.</div>
-  <div id="persona-output-wrap" style="display:none">
+  <!-- Progress -->
+  <div id="progress-section" style="display:none">
+    <div class="steps">
+      <div class="step pending" id="step-1">
+        <div class="step-dot">1</div>
+        <div class="step-content">
+          <div class="step-title">Generando prompt de rostro con IA</div>
+          <div class="step-detail" id="step-1-detail"></div>
+        </div>
+      </div>
+      <div class="step pending" id="step-2">
+        <div class="step-dot">2</div>
+        <div class="step-content">
+          <div class="step-title">Generando rostro con ComfyDeploy</div>
+          <div class="step-detail" id="step-2-detail"></div>
+        </div>
+      </div>
+      <div class="step pending" id="step-3">
+        <div class="step-dot">3</div>
+        <div class="step-content">
+          <div class="step-title">Generando prompt de cuerpo con IA</div>
+          <div class="step-detail" id="step-3-detail"></div>
+        </div>
+      </div>
+      <div class="step pending" id="step-4">
+        <div class="step-dot">4</div>
+        <div class="step-content">
+          <div class="step-title">Generando cuerpo con ComfyDeploy</div>
+          <div class="step-detail" id="step-4-detail"></div>
+        </div>
+      </div>
+      <div class="step pending" id="step-5">
+        <div class="step-dot">5</div>
+        <div class="step-content">
+          <div class="step-title">Generando perfil completo con Claude</div>
+          <div class="step-detail" id="step-5-detail"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Results -->
+  <div id="result-section" style="display:none">
+    <div class="result-images">
+      <div class="result-img-wrap">
+        <div class="result-img-label">Rostro</div>
+        <div id="result-face-placeholder" class="result-img-placeholder" style="aspect-ratio:1">Esperando...</div>
+        <img id="result-face-img" src="" alt="Rostro" style="display:none" onclick="window.open(this.src,'_blank')">
+      </div>
+      <div class="result-img-wrap">
+        <div class="result-img-label">Cuerpo</div>
+        <div id="result-body-placeholder" class="result-img-placeholder" style="aspect-ratio:.6">Esperando...</div>
+        <img id="result-body-img" src="" alt="Cuerpo" style="display:none" onclick="window.open(this.src,'_blank')">
+      </div>
+    </div>
+
     <div id="persona-output"></div>
-    <div class="row" style="margin-top:12px">
+    <div class="row" style="margin-top:12px" id="copy-wrap" style="display:none">
       <button class="btn-copy" onclick="copyPersona()">Copiar perfil</button>
     </div>
   </div>
 
   <div class="deployment-id">
-    fase 1: d3e4cb7d &nbsp;|&nbsp; fase 2: cabf22a3 &nbsp;|&nbsp; fase 3: claude-sonnet-4-6
+    fase 1: d3e4cb7d &nbsp;|&nbsp; fase 2: cabf22a3 &nbsp;|&nbsp; cerebro: claude-sonnet-4-6
   </div>
 </div>
 
 <script>
 const POLL_INTERVAL = 8000
 
-async function generate() {
-  const prompt = document.getElementById('prompt').value.trim()
-  const count  = Math.min(Math.max(parseInt(document.getElementById('count').value) || 1, 1), 4)
-  const btn    = document.getElementById('btn-generate')
-  const status = document.getElementById('status')
-  const grid   = document.getElementById('grid')
+let generatedFaceUrl   = null
+let generatedBodyUrl   = null
+let generatedFacePrompt = null
 
-  if (!prompt) { setStatus('Escribe una descripción primero.', 'error'); return }
+function setStep(n, state, detail) {
+  const el = document.getElementById(`step-${n}`)
+  el.className = `step ${state}`
+  const dot = el.querySelector('.step-dot')
+  if (state === 'done')  dot.textContent = '✓'
+  else if (state === 'error') dot.textContent = '✕'
+  else dot.textContent = n
+  if (detail !== undefined) {
+    document.getElementById(`step-${n}-detail`).textContent = detail
+  }
+}
+
+async function generateAll() {
+  const nombre = document.getElementById('nombre').value.trim()
+  const nicho  = document.getElementById('nicho').value.trim()
+  const btn    = document.getElementById('btn-main')
+
+  if (!nombre) { alert('Escribe el nombre de la influencer.'); return }
+  if (!nicho)  { alert('Escribe el nicho de contenido.'); return }
 
   btn.disabled = true
-  grid.innerHTML = ''
-  setStatus('Enviando a ComfyDeploy...')
+  generatedFaceUrl    = null
+  generatedBodyUrl    = null
+  generatedFacePrompt = null
 
-  // placeholder cards
-  const cards = []
-  for (let i = 0; i < count; i++) {
-    const card = makeCard(i + 1, 'generating')
-    grid.appendChild(card.el)
-    cards.push(card)
-  }
+  // Reset progress
+  for (let i = 1; i <= 5; i++) setStep(i, 'pending', '')
+  document.getElementById('progress-section').style.display = 'block'
+
+  // Reset results
+  document.getElementById('result-section').style.display = 'none'
+  document.getElementById('result-face-img').style.display = 'none'
+  document.getElementById('result-face-placeholder').style.display = 'flex'
+  document.getElementById('result-body-img').style.display = 'none'
+  document.getElementById('result-body-placeholder').style.display = 'flex'
+  document.getElementById('persona-output').innerHTML = ''
+  document.getElementById('copy-wrap').style.display = 'none'
 
   try {
-    const res  = await fetch('/api/generate', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ prompt, count }),
+    // ── Paso 1: Prompt de rostro ──────────────────────────
+    setStep(1, 'active', 'Claude generando prompt hiperdescriptivo...')
+    const r1   = await apiFetch('/api/generate-prompt', { nombre, nicho, tipo: 'face' })
+    generatedFacePrompt = r1.prompt
+    setStep(1, 'done', generatedFacePrompt)
+
+    // ── Paso 2: Rostro con ComfyDeploy ───────────────────
+    setStep(2, 'active', 'Enviando a ComfyDeploy...')
+    const r2      = await apiFetch('/api/generate', { prompt: generatedFacePrompt, count: 1 })
+    const faceRunId = r2.runIds[0]
+    setStep(2, 'active', `En cola (run: ${faceRunId.slice(0,8)}...) — puede tardar 1–5 min`)
+    generatedFaceUrl = await pollForImage(faceRunId, 2)
+
+    document.getElementById('result-section').style.display = 'block'
+    document.getElementById('result-face-placeholder').style.display = 'none'
+    const faceImg = document.getElementById('result-face-img')
+    faceImg.src = generatedFaceUrl
+    faceImg.style.display = 'block'
+    setStep(2, 'done', 'Rostro generado')
+
+    // ── Paso 3: Prompt de cuerpo ──────────────────────────
+    setStep(3, 'active', 'Claude generando prompt de cuerpo...')
+    const r3 = await apiFetch('/api/generate-prompt', {
+      nombre, nicho, tipo: 'body', face_description: generatedFacePrompt,
     })
-    const data = await res.json()
-    if (!res.ok || data.error) throw new Error(data.error || `HTTP ${res.status}`)
+    const bodyPrompt = r3.prompt
+    setStep(3, 'done', bodyPrompt)
 
-    const { runIds } = data
-    setStatus(`${runIds.length} trabajo(s) en cola. Esperando resultados...`)
+    // ── Paso 4: Cuerpo con ComfyDeploy ───────────────────
+    setStep(4, 'active', 'Enviando a ComfyDeploy...')
+    const r4      = await apiFetch('/api/generate-body', {
+      prompt: bodyPrompt, input_image: generatedFaceUrl,
+    })
+    const bodyRunId = r4.runIds[0]
+    setStep(4, 'active', `En cola (run: ${bodyRunId.slice(0,8)}...) — puede tardar 1–5 min`)
+    generatedBodyUrl = await pollForImage(bodyRunId, 4)
 
-    // poll all runs in parallel
-    await Promise.all(runIds.map((runId, i) => pollUntilDone(runId, cards[i])))
-    setStatus(`¡Listo! ${count} imagen(es) generada(s).`, 'success')
+    document.getElementById('result-body-placeholder').style.display = 'none'
+    const bodyImg = document.getElementById('result-body-img')
+    bodyImg.src = generatedBodyUrl
+    bodyImg.style.display = 'block'
+    setStep(4, 'done', 'Cuerpo generado')
+
+    // ── Paso 5: Perfil AI Persona ─────────────────────────
+    setStep(5, 'active', 'Claude generando perfil completo... (~30 seg)')
+    const r5 = await apiFetch('/api/generate-persona', {
+      nombre, nicho, face_url: generatedFaceUrl, body_url: generatedBodyUrl,
+    })
+    renderPersona(r5.persona, nombre, nicho)
+    setStep(5, 'done', `Perfil de ${nombre} listo`)
+
+    document.getElementById('copy-wrap').style.display = 'flex'
+    document.getElementById('result-section').scrollIntoView({ behavior: 'smooth', block: 'start' })
+
   } catch (err) {
-    setStatus(`Error: ${err.message}`, 'error')
-    cards.forEach(c => c.setError())
+    console.error(err)
+    for (let i = 1; i <= 5; i++) {
+      if (document.getElementById(`step-${i}`).classList.contains('active')) {
+        setStep(i, 'error', err.message)
+        break
+      }
+    }
   } finally {
     btn.disabled = false
   }
 }
 
-async function pollUntilDone(runId, card, deadline = Date.now() + 600_000) {
-  card.setLabel(`run: ${runId.slice(0, 8)}...`)
+async function apiFetch(path, body) {
+  const res  = await fetch(path, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+  const data = await res.json()
+  if (!res.ok || data.error) throw new Error(data.error || `HTTP ${res.status}`)
+  return data
+}
+
+async function pollForImage(runId, stepNum) {
+  const deadline = Date.now() + 600_000
+  let elapsed = 0
   while (Date.now() < deadline) {
     await sleep(POLL_INTERVAL)
+    elapsed += POLL_INTERVAL
     try {
       const res  = await fetch(`/api/status/${runId}`)
       const data = await res.json()
-
       if (data.status === 'success') {
         const images = data.images || []
-        if (images[0]) {
-          card.setImage(images[0])
-        } else {
-          card.setError('sin imagen')
-        }
-        return
+        if (!images[0]) throw new Error('ComfyDeploy no devolvió imagen')
+        return images[0]
       }
-      if (data.status === 'error') {
-        card.setError(data.message || 'error')
-        return
-      }
-      // still running — keep polling
+      if (data.status === 'error') throw new Error(data.message || 'ComfyDeploy error')
+      setStep(stepNum, 'active', `Procesando... ${Math.round(elapsed / 1000)}s`)
     } catch (err) {
+      if (err.message.includes('ComfyDeploy')) throw err
       console.warn('poll error:', err.message)
     }
   }
-  card.setError('timeout')
+  throw new Error('Timeout — ComfyDeploy no respondió en 10 minutos')
 }
 
-function makeCard(n, state) {
-  const el = document.createElement('div')
-  el.className = `card ${state}`
-  el.innerHTML = `
-    <div class="placeholder">
-      <div class="spinner"></div>
-      <span>En cola...</span>
-    </div>
-    <div class="card-label">${n}</div>
-  `
-  return {
-    el,
-    setImage(src) {
-      el.className = 'card done'
-      el.innerHTML = `
-        <img src="${escHtml(src)}" alt="Rostro ${n}" onclick="window.open('${escHtml(src)}','_blank')">
-        <div class="card-label">${n}</div>
-        <button class="btn-select" id="sel-${n}" onclick="selectFace('${escHtml(src)}', ${n})">SELECCIONAR</button>
-      `
-    },
-    setError(msg = 'error') {
-      el.className = 'card'
-      el.innerHTML = `<div class="placeholder" style="color:#f87171"><span>✕ ${escHtml(msg)}</span></div><div class="card-label">${n}</div>`
-    },
-    setLabel(txt) {
-      const lbl = el.querySelector('.card-label')
-      if (lbl) lbl.textContent = txt
-    },
-  }
-}
-
-let selectedFaceUrl = null
-
-function selectFace(src, n) {
-  selectedFaceUrl = src
-
-  // update preview
-  document.getElementById('face-placeholder').style.display = 'none'
-  const img = document.getElementById('face-preview-img')
-  img.src = src
-  img.style.display = 'block'
-  document.getElementById('face-preview-label').textContent = `Rostro ${n} seleccionado`
-
-  // enable generate button
-  document.getElementById('btn-generate-body').disabled = false
-
-  // mark selected card, reset others
-  document.querySelectorAll('.btn-select').forEach(b => {
-    b.textContent = 'SELECCIONAR'
-    b.classList.remove('selected')
-  })
-  const btn = document.getElementById(`sel-${n}`)
-  if (btn) { btn.textContent = '✓ SELECCIONADO'; btn.classList.add('selected') }
-
-  setBodyStatus('Rostro cargado. Escribe la descripción del cuerpo y genera.')
-
-  // sync to phase 3 face preview
-  document.getElementById('p3-face-empty').style.display = 'none'
-  const p3img = document.getElementById('p3-face-img')
-  p3img.src = src
-  p3img.style.display = 'block'
-  document.getElementById('p3-face-label').textContent = '✓ Rostro'
-  checkPersonaReady()
-}
-
-async function generateBody() {
-  const prompt = document.getElementById('body-prompt').value.trim()
-  const btn    = document.getElementById('btn-generate-body')
-
-  if (!selectedFaceUrl) { setBodyStatus('Selecciona un rostro primero.', 'error'); return }
-  if (!prompt)          { setBodyStatus('Escribe una descripción del cuerpo.', 'error'); return }
-
-  btn.disabled = true
-  const grid = document.getElementById('body-grid')
-  grid.innerHTML = ''
-  setBodyStatus('Enviando a ComfyDeploy...')
-
-  const card = makeBodyCard()
-  grid.appendChild(card.el)
-
-  try {
-    const res  = await fetch('/api/generate-body', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ prompt, input_image: selectedFaceUrl }),
-    })
-    const data = await res.json()
-    if (!res.ok || data.error) throw new Error(data.error || `HTTP ${res.status}`)
-
-    setBodyStatus('En proceso. Esto puede tardar 1–3 minutos...')
-    await pollUntilDoneBody(data.runIds[0], card)
-    setBodyStatus('¡Cuerpo generado!', 'success')
-  } catch (err) {
-    setBodyStatus(`Error: ${err.message}`, 'error')
-    card.setError()
-  } finally {
-    btn.disabled = false
-  }
-}
-
-async function pollUntilDoneBody(runId, card, deadline = Date.now() + 600_000) {
-  while (Date.now() < deadline) {
-    await sleep(POLL_INTERVAL)
-    try {
-      const res  = await fetch(`/api/status/${runId}`)
-      const data = await res.json()
-      if (data.status === 'success') {
-        const images = data.images || []
-        if (images[0]) { card.setImage(images[0]) } else { card.setError('sin imagen') }
-        return
-      }
-      if (data.status === 'error') { card.setError(data.message || 'error'); return }
-    } catch (err) { console.warn('poll body error:', err.message) }
-  }
-  card.setError('timeout')
-}
-
-function makeBodyCard() {
-  const el = document.createElement('div')
-  el.className = 'card generating'
-  el.innerHTML = `<div class="placeholder"><div class="spinner"></div><span>Generando...</span></div>`
-  const id = 'body-sel-' + Date.now()
-  return {
-    el,
-    setImage(src) {
-      el.className = 'card done'
-      el.innerHTML = `
-        <img src="${escHtml(src)}" alt="Cuerpo generado" onclick="window.open('${escHtml(src)}','_blank')">
-        <button class="btn-select" id="${id}" onclick="selectBody('${escHtml(src)}')">SELECCIONAR</button>
-      `
-    },
-    setError(msg = 'error') {
-      el.className = 'card'
-      el.innerHTML = `<div class="placeholder" style="color:#f87171"><span>✕ ${escHtml(msg)}</span></div>`
-    },
-  }
-}
-
-let selectedBodyUrl = null
-
-function selectBody(src) {
-  selectedBodyUrl = src
-
-  document.getElementById('p3-body-empty').style.display = 'none'
-  const img = document.getElementById('p3-body-img')
-  img.src = src
-  img.style.display = 'block'
-  document.getElementById('p3-body-label').textContent = '✓ Cuerpo'
-
-  // mark button
-  document.querySelectorAll('[id^="body-sel-"]').forEach(b => {
-    b.textContent = 'SELECCIONAR'; b.classList.remove('selected')
-  })
-  event.target.textContent = '✓ SELECCIONADO'
-  event.target.classList.add('selected')
-
-  checkPersonaReady()
-}
-
-function checkPersonaReady() {
-  const ready = selectedFaceUrl && selectedBodyUrl
-  document.getElementById('btn-generate-persona').disabled = !ready
-  if (ready) setPersonaStatus('Listo. Agrega nombre y nicho y genera el perfil.')
-}
-
-async function generatePersona() {
-  const nombre = document.getElementById('p3-nombre').value.trim()
-  const nicho  = document.getElementById('p3-nicho').value.trim()
-  const btn    = document.getElementById('btn-generate-persona')
-
-  if (!nombre) { setPersonaStatus('Escribe el nombre de la influencer.', 'error'); return }
-  if (!nicho)  { setPersonaStatus('Escribe el nicho de contenido.', 'error'); return }
-
-  btn.disabled = true
-  document.getElementById('persona-output-wrap').style.display = 'none'
-  setPersonaStatus('Generando perfil con Claude AI... esto tarda ~30 segundos.')
-
-  try {
-    const res  = await fetch('/api/generate-persona', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        nombre,
-        nicho,
-        face_url: selectedFaceUrl || '',
-        body_url: selectedBodyUrl || '',
-      }),
-    })
-    const data = await res.json()
-    if (!res.ok || data.error) throw new Error(data.error || `HTTP ${res.status}`)
-
-    renderPersona(data.persona)
-    setPersonaStatus(`¡Perfil de ${nombre} generado!`, 'success')
-  } catch (err) {
-    setPersonaStatus(`Error: ${err.message}`, 'error')
-  } finally {
-    btn.disabled = false
-  }
-}
+// ── Persona rendering (same logic as v1) ────────────────
 
 function parsePersona(text) {
   const sections = []
@@ -770,7 +515,6 @@ function parsePersona(text) {
   for (const raw of text.split('\n')) {
     const line = raw.trim()
     if (!line) continue
-    // Section header: starts with emoji, no colon (or title line)
     const isHeader = /^[💎📛📏🌍🐾🍣🎵🎬💫📲🔥🧷🖋️🧠]/.test(line) && !line.includes(':')
     if (isHeader) {
       current = { title: line.replace(/\*\*/g,''), fields: [] }
@@ -788,25 +532,21 @@ function parsePersona(text) {
   return sections
 }
 
-function renderPersona(text) {
-  const sections  = parsePersona(text)
-  const aliasS    = sections.find(s => /Alias/i.test(s.title)) || {}
-  const aliasF    = k => (aliasS.fields || []).find(f => new RegExp(k,'i').test(f.key))?.val || ''
+function renderPersona(text, nombre, nicho) {
+  const sections = parsePersona(text)
+  const aliasS   = sections.find(s => /Alias/i.test(s.title)) || {}
+  const aliasF   = k => (aliasS.fields || []).find(f => new RegExp(k,'i').test(f.key))?.val || ''
 
-  const stageName = aliasF('Stage|Nombre artístico') || document.getElementById('p3-nombre').value
+  const stageName = aliasF('Stage|Nombre artístico') || nombre
   const handle    = aliasF('Handle|Usuario')
   const edad      = aliasF('Edad|Age')
   const signo     = aliasF('Signo|Zodiac')
-  const nicho     = document.getElementById('p3-nicho').value
 
-  let html = `<div class="profile-card">`
-
-  // Hero
-  html += `<div class="profile-hero">`
-  if (selectedFaceUrl || selectedBodyUrl) {
+  let html = `<div class="profile-card"><div class="profile-hero">`
+  if (generatedFaceUrl || generatedBodyUrl) {
     html += `<div class="profile-photos">`
-    if (selectedFaceUrl) html += `<img src="${escHtml(selectedFaceUrl)}" alt="Rostro">`
-    if (selectedBodyUrl) html += `<img src="${escHtml(selectedBodyUrl)}" alt="Cuerpo">`
+    if (generatedFaceUrl) html += `<img src="${escHtml(generatedFaceUrl)}" alt="Rostro">`
+    if (generatedBodyUrl) html += `<img src="${escHtml(generatedBodyUrl)}" alt="Cuerpo">`
     html += `</div>`
   }
   html += `<div class="profile-hero-info">
@@ -816,7 +556,6 @@ function renderPersona(text) {
     <div class="profile-niche">${escHtml(nicho)}</div>
   </div></div>`
 
-  // Sections grid
   html += `<div class="edit-hint">✏️ Haz clic en cualquier campo para editarlo</div>`
   html += `<div class="profile-sections">`
   for (const sec of sections) {
@@ -837,14 +576,11 @@ function renderPersona(text) {
   }
   html += `</div></div>`
 
-  const out = document.getElementById('persona-output')
-  out.innerHTML = html
-  document.getElementById('persona-output-wrap').style.display = 'block'
-  out.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  document.getElementById('persona-output').innerHTML = html
 }
 
 function copyPersona() {
-  const card = document.getElementById('persona-output')
+  const card  = document.getElementById('persona-output')
   const lines = []
   card.querySelectorAll('.profile-section').forEach(sec => {
     lines.push('\n' + sec.querySelector('.section-title').innerText)
@@ -860,24 +596,6 @@ function copyPersona() {
     btn.textContent = '¡Copiado!'
     setTimeout(() => { btn.textContent = 'Copiar perfil' }, 2000)
   })
-}
-
-function setPersonaStatus(msg, cls = '') {
-  const el = document.getElementById('persona-status')
-  el.textContent = msg
-  el.className = `status-bar ${cls}`
-}
-
-function setBodyStatus(msg, cls = '') {
-  const el = document.getElementById('body-status')
-  el.textContent = msg
-  el.className = `status-bar ${cls}`
-}
-
-function setStatus(msg, cls = '') {
-  const el = document.getElementById('status')
-  el.textContent = msg
-  el.className = `status-bar ${cls}`
 }
 
 function escHtml(s) {
