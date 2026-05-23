@@ -541,7 +541,7 @@ const server = http.createServer(async (req, res) => {
       }
 
       if (body.images) {
-        const imageKeys = ['ojos','cejas','nariz','labios','frente','pomulos','piel','menton','cabello','rostro completo']
+        const imageKeys = ['eyes','eyebrows','nose','lips','forehead','jawline','hairline','skin','full_face']
         for (const key of imageKeys) {
           if (body.images[key]) inputs[key] = body.images[key]
         }

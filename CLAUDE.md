@@ -38,7 +38,7 @@ Automatización para crear influencers virtuales con IA — cualquier etnia, cua
 El usuario configura el rostro manualmente vía AION (imágenes de referencia + parámetros hiperpersonalizados) y la IA genera el cuerpo y el perfil de personalidad.
 
 **Stack operativo:**
-- `server.cjs` — servidor Node.js local, cerebro de toda la automatización
+- `server.cjs` — servidor Node.js local, cerebro de toda la automatización (usa solo módulos nativos, sin npm install)
 - `server-ui.html` — interfaz visual en el browser (todo en un solo HTML)
 - `iniciar.bat` — lanzador Windows
 - `.env` — variables de entorno (nunca commitear)
@@ -63,9 +63,9 @@ El usuario configura el nombre, nicho y parámetros de rostro, luego hace clic e
 PASO 1 — Generación de rostro con AION
   Browser: POST /api/generate-face {
     photo_type,           ← siempre requerido
-    images: {             ← solo si toggle A está ON
-      ojos, cejas, nariz, labios, frente,
-      pomulos, piel, menton, cabello, "rostro completo"
+    images: {             ← solo si toggle A está ON (9 slots)
+      eyes, eyebrows, nose, lips, forehead,
+      jawline, hairline, skin, full_face
     },
     params: {             ← solo si toggle B está ON
       43 COMBO params de AION
@@ -100,18 +100,20 @@ PASO 4 — Perfil AI Persona
 
 ### Upload de imágenes de referencia (Toggle A)
 
+El workflow AION usa `ExternalImage (ComfyUI Deploy)` nodes conectados directamente al `AionThetaNode`. Cuando se manda una URL, AION la usa. Cuando no se manda, el input es `None` y AION lo ignora nativamente.
+
 ```
 Browser: FileReader → base64
 Browser: POST /api/upload-image { name, data: "<base64>", type: "image/jpeg" }
 Server:  decodifica base64 → buffer binary → POST Supabase Storage REST API
          /storage/v1/object/zami-images/refs/{timestamp}-{name}.{ext}
-         Authorization: Bearer {SUPABASE_ANON_KEY}
+         Authorization: Bearer {VITE_SUPABASE_ANON_KEY}
          x-upsert: true
 Server:  returns { url: "https://{SUPABASE_URL}/storage/v1/object/public/zami-images/refs/..." }
 Browser: guarda url en uploadedImages[slotId]
 ```
 
-### Fase 4 — Contenido UGC Semanal (sin cambios respecto a v3)
+### Fase 4 — Contenido UGC Semanal
 
 ```
 FASE 4 — Contenido Semanal (se repite cada semana por cada influencer)
@@ -143,24 +145,27 @@ FASE 4 — Contenido Semanal (se repite cada semana por cada influencer)
 
 ### Workflow deployment AION
 - **Deployment ID:** `c6e6b7f0-e574-4aa8-9012-54e8507202e2`
-- **Input `imagen final`:** siempre hardcodeado como `"Nano Banana Pro"` (prefijo del archivo de salida SaveImage)
+- **Input `imagen final`:** siempre hardcodeado como `"Nano Banana Pro"` (prefijo del archivo de output SaveImage)
 - **Input `photo_type`:** siempre enviado; default `"-- Not selected / System inferred --"`
 
-### Modos del nodo AION (determinados internamente por el nodo según qué inputs recibe)
+### Arquitectura del workflow (v4 ExternalImage)
+El workflow usa nodos `ExternalImage (ComfyUI Deploy)` conectados directamente al `AionThetaNode`. No hay `LoadImage` hardcodeados ni `Fast Groups Muter` para control de API. AION detecta internamente qué inputs recibió y activa el modo correspondiente.
+
+### Modos del nodo AION
 - **auto_detect** — cuando se proveen imágenes de referencia (Toggle A ON)
 - **manual_select** — cuando se proveen COMBO params (Toggle B ON)
 - **generate_new** — cuando solo se provee prompt de texto (Toggle C ON)
 
-### Toggle A — 10 slots de imágenes de referencia
+### Toggle A — 9 slots de imágenes de referencia
 Los slots se incluyen en el payload solo si tienen URL subida. Keys del objeto `images`:
 ```
-ojos, cejas, nariz, labios, frente, pomulos, piel, menton, cabello, "rostro completo"
+eyes, eyebrows, nose, lips, forehead, jawline, hairline, skin, full_face
 ```
 Cada imagen se sube a Supabase antes de enviarse a ComfyDeploy.
 
 ### Toggle B — 43 COMBO params
 Grupos: Demographics, Eyes, Eyebrows, Nose, Lips, Structure, Volumes, Hair, Skin, Defects, Expression.
-Se incluyen en el payload solo si el toggle B está ON. Si el toggle está OFF, las keys se omiten del payload (AION usa sus defaults internos).
+Se incluyen en el payload solo si el toggle B está ON. Si OFF, las keys se omiten (AION usa defaults internos).
 
 ### Toggle C — Prompt libre
 Texto libre que describe el rostro. Se incluye solo si toggle C está ON y hay texto escrito.
@@ -180,11 +185,17 @@ Content-Type: application/json
   "inputs": {
     "photo_type": "...",
     "imagen final": "Nano Banana Pro",
-    "prompt": "...",            ← solo si toggle C ON
-    "ojos": "https://...",      ← solo si toggle A ON y slot tiene imagen
-    "cejas": "https://...",
-    ... (hasta 10 image slots)
-    "sex": "Female",            ← solo si toggle B ON
+    "prompt": "...",              ← solo si toggle C ON
+    "eyes": "https://...",        ← solo si toggle A ON y slot tiene imagen
+    "eyebrows": "https://...",
+    "nose": "https://...",
+    "lips": "https://...",
+    "forehead": "https://...",
+    "jawline": "https://...",
+    "hairline": "https://...",
+    "skin": "https://...",
+    "full_face": "https://...",
+    "sex": "female",              ← solo si toggle B ON
     "ethnicity": "...",
     ... (hasta 43 COMBO params)
   }
@@ -204,14 +215,13 @@ Body: binary buffer
 Public URL: https://vtyuylgfjvleywupbdzl.supabase.co/storage/v1/object/public/zami-images/refs/{filename}
 ```
 
-**Bucket requerido:** `zami-images` — debe ser público con policy INSERT para rol `anon`.
+**Bucket:** `zami-images` — público, policy `FOR ALL TO anon`.
 
 ### Anthropic — Body Prompt
 ```
 POST https://api.anthropic.com/v1/messages
 { "model": "claude-sonnet-4-6", "max_tokens": 500,
   "messages": [{ "role": "user", "content": "<instrucción con face_description>" }] }
-→ { "content": [{ "text": "<prompt de cuerpo en inglés>" }] }
 ```
 
 ### ComfyDeploy — Cuerpo
@@ -231,18 +241,17 @@ POST https://api.anthropic.com/v1/messages
   } }
 ```
 
-### ComfyDeploy — Polling de estado
+### ComfyDeploy — Polling
 ```
 GET https://api.comfydeploy.com/api/run/{run_id}
 → { "status": "queued|running|started|uploading|success|failed|cancelled|timeout",
     "outputs": [{ "data": { [nodeKey]: [{ "url": "https://...", "type": "image/png" }] } }] }
 
 Estados terminales: success, failed, cancelled, timeout
-El browser hace polling cada 8 segundos.
-extractImages() parsea: array de outputs con data.[nodeKey][].url
+Polling cada 8 segundos.
 ```
 
-### Anthropic — Perfil AI Persona
+### Anthropic — AI Persona
 ```
 POST https://api.anthropic.com/v1/messages
 { "model": "claude-sonnet-4-6", "max_tokens": 4000,
@@ -253,7 +262,7 @@ POST https://api.anthropic.com/v1/messages
   ]}] }
 ```
 
-### Anthropic — Plan de Contenido Semanal
+### Anthropic — Plan Semanal
 ```
 POST https://api.anthropic.com/v1/messages
 { "model": "claude-sonnet-4-6", "max_tokens": 8000,
@@ -262,7 +271,7 @@ POST https://api.anthropic.com/v1/messages
     { "type": "image", "source": { "type": "url", "url": "<body_url>" } },
     { "type": "text", "text": "<AI Persona + historial + instrucciones>" }
   ]}] }
-→ JSON con: { theme, summary, week[5] } — cada día tiene scene, caption, hashtags, variations[4]
+→ JSON: { theme, summary, week[5] } — cada día: scene, caption, hashtags, variations[4]
 ```
 
 ---
@@ -272,70 +281,17 @@ POST https://api.anthropic.com/v1/messages
 | Método | Ruta | Body | Descripción |
 |---|---|---|---|
 | `GET` | `/` | — | Sirve server-ui.html |
-| `POST` | `/api/upload-image` | `{ name, data: base64, type }` | Sube imagen a Supabase Storage → retorna `{ url }` |
-| `POST` | `/api/generate-face` | `{ photo_type, images?, params?, prompt? }` | AION face generation en ComfyDeploy |
+| `POST` | `/api/upload-image` | `{ name, data: base64, type }` | Sube imagen a Supabase Storage → `{ url }` |
+| `POST` | `/api/generate-face` | `{ photo_type, images?, params?, prompt? }` | AION face generation |
 | `POST` | `/api/generate-body-prompt` | `{ nombre, nicho, face_description }` | Claude genera prompt de cuerpo |
 | `POST` | `/api/generate-body` | `{ prompt, input_image }` | Genera cuerpo en ComfyDeploy |
-| `POST` | `/api/generate-persona` | `{ nombre, nicho, face_url, body_url }` | Claude genera perfil AI Persona |
-| `GET` | `/api/status/:runId` | — | Polling de estado ComfyDeploy |
+| `POST` | `/api/generate-persona` | `{ nombre, nicho, face_url, body_url }` | Claude genera AI Persona |
+| `GET` | `/api/status/:runId` | — | Polling estado ComfyDeploy |
 | `GET` | `/api/influencers` | — | Lista influencers guardadas |
-| `POST` | `/api/influencers` | `{ nombre, nicho, face_url, body_url, persona }` | Guarda nueva influencer |
-| `POST` | `/api/influencers/:id/weeks` | `{ theme, summary, plan }` | Guarda semana en historial |
-| `POST` | `/api/generate-content-plan` | `{ persona, nombre, nicho, face_url, body_url, week_history }` | Claude genera plan semanal |
-| `POST` | `/api/generate-content-day` | `{ face_url, body_url, prompts[4] }` | Lanza 1 run → 4 imágenes UGC |
-
-**Endpoints eliminados (v4):**
-- `POST /api/generate-prompt` — ya no existe; Claude no genera el prompt de rostro
-- `POST /api/generate` — reemplazado por `/api/generate-face`
-
----
-
-## UI — FLUJO VISUAL (server-ui.html v4 AION)
-
-```
-┌─────────────────────────────────────────────────┐
-│  Zami AI Studio [v3 AION]                       │
-│  "Configura el rostro manualmente con AION"     │
-├─────────────────────────────────────────────────┤
-│  MIS INFLUENCERS                 [+ Nueva]      │
-│  ┌────────┐ ┌────────┐                          │
-│  │Valentina│ │ Luna   │  ← cards guardadas      │
-│  └────────┘ └────────┘                          │
-├─────────────────────────────────────────────────┤
-│  CREAR INFLUENCER                               │
-│                                                 │
-│  [NOMBRE ___________] [NICHO ___________]       │
-│  [PHOTO TYPE ▼]   ← siempre visible             │
-│                                                 │
-│  [◉ Toggle A] Imágenes de referencia            │
-│    10 slots drag-drop: ojos, cejas, nariz,      │
-│    labios, frente, pómulos, piel, mentón,       │
-│    cabello, rostro completo                     │
-│                                                 │
-│  [◉ Toggle B] Parámetros AION                   │
-│    43 COMBO dropdowns agrupados por categoría   │
-│    (Demographics, Eyes, Eyebrows, Nose, Lips,   │
-│     Structure, Volumes, Hair, Skin, Defects,    │
-│     Expression)                                 │
-│                                                 │
-│  [◉ Toggle C] Prompt libre                      │
-│    textarea de descripción de rostro            │
-│                                                 │
-│  [▶ GENERAR INFLUENCER COMPLETA]                │
-│                                                 │
-│  ○─ 1. Generando rostro con AION                │
-│  ○─ 2. Generando prompt de cuerpo con IA        │
-│  ○─ 3. Generando cuerpo con ComfyDeploy         │
-│  ○─ 4. Generando perfil completo con Claude     │
-│                                                 │
-│  [Guardar Influencer] ← al terminar             │
-├─────────────────────────────────────────────────┤
-│  FASE 4 — Contenido Semanal UGC                 │
-│  [Generar Plan Semanal]                         │
-│  [Generar Semana — 20 imágenes]                 │
-│  [Guardar semana en historial]                  │
-└─────────────────────────────────────────────────┘
-```
+| `POST` | `/api/influencers` | `{ nombre, nicho, face_url, body_url, persona }` | Guarda influencer |
+| `POST` | `/api/influencers/:id/weeks` | `{ theme, summary, plan }` | Guarda semana |
+| `POST` | `/api/generate-content-plan` | `{ persona, nombre, nicho, face_url, body_url, week_history }` | Plan semanal |
+| `POST` | `/api/generate-content-day` | `{ face_url, body_url, prompts[4] }` | 1 run → 4 imágenes UGC |
 
 ---
 
@@ -343,33 +299,34 @@ POST https://api.anthropic.com/v1/messages
 
 | Archivo | Función |
 |---|---|
-| `server.cjs` | Servidor local — pipeline AION v4 + Fases 2–4 operativas |
-| `server-ui.html` | UI v4 AION — 3 toggles + upload + 43 params + 4-step pipeline |
-| `iniciar.bat` | Lanzador Windows — mata node previo, arranca server |
-| `.env` | Variables de entorno (no commitear nunca) |
-| `.env.example` | Template de variables para configurar el proyecto |
-| `data/influencers.json` | Persistencia local de influencers y historial de semanas |
+| `server.cjs` | Servidor local — pipeline completo |
+| `server-ui.html` | UI — 3 toggles + upload + 43 params + 4-step pipeline |
+| `iniciar.bat` | Lanzador Windows |
+| `.env` | Variables de entorno (no commitear) |
+| `.env.example` | Template de variables |
+| `data/influencers.json` | Persistencia local |
+| `CLAUDE.md` | Esta documentación |
 
 ---
 
 ## VARIABLES DE ENTORNO (`.env`)
 
 ```env
-# REQUERIDAS para el pipeline actual
-VITE_COMFYDEPLOY_API_KEY=       ← todas las fases de imágenes
-ANTHROPIC_API_KEY=              ← body prompt, persona, plan semanal
+# REQUERIDAS
+VITE_COMFYDEPLOY_API_KEY=
+ANTHROPIC_API_KEY=
 
 # DEPLOYMENT IDs activos
 VITE_COMFYDEPLOY_AION_DEPLOYMENT_ID=c6e6b7f0-e574-4aa8-9012-54e8507202e2
 VITE_COMFYDEPLOY_BODY_DEPLOYMENT_ID=cabf22a3-a697-485c-a6df-b6c09ee4f2f1
 VITE_COMFYDEPLOY_CONTENT_DEPLOYMENT_ID=8d4702cb-c504-4bf2-8284-ee17d6e66633
 
-# Supabase Storage (upload de imágenes de referencia)
+# Supabase Storage
 VITE_SUPABASE_URL=https://vtyuylgfjvleywupbdzl.supabase.co
-VITE_SUPABASE_ANON_KEY=         ← anon key del proyecto Supabase
-SUPABASE_BUCKET=zami-images     ← bucket público con INSERT policy para anon
+VITE_SUPABASE_ANON_KEY=
+SUPABASE_BUCKET=zami-images
 
-# PENDIENTES para fases futuras
+# PENDIENTES fases futuras
 VITE_COMFYDEPLOY_NSFW_DEPLOYMENT_ID=
 VITE_FAL_API_KEY=
 ```
@@ -380,58 +337,34 @@ VITE_FAL_API_KEY=
 
 | Fase | Nombre | Motor | Estado |
 |---|---|---|---|
-| 1 | Generación de Rostro AION (manual) | ComfyDeploy `c6e6b7f0` (AION Gemini) | ✅ Operativo |
+| 1 | Generación de Rostro AION | ComfyDeploy `c6e6b7f0` | ✅ Operativo |
 | 2 | Prompt de Cuerpo | Anthropic `claude-sonnet-4-6` | ✅ Operativo |
 | 3 | Generación de Cuerpo | ComfyDeploy `cabf22a3` | ✅ Operativo |
-| 4 | Perfil AI Persona | Anthropic `claude-sonnet-4-6` — texto en español | ✅ Operativo |
+| 4 | Perfil AI Persona | Anthropic `claude-sonnet-4-6` | ✅ Operativo |
 | Fase 4 | Contenido UGC Semanal | Claude + ComfyDeploy `8d4702cb` | ✅ Operativo |
-| Fase 5 | Publicación | Por definir | ⏳ |
-| Fase 6 | KPIs | Supabase | ⏳ |
-
-**Eliminado en v4:** Prompt de Rostro con IA (Claude) — reemplazado completamente por inputs manuales AION.
+| Fase 5 | Publicación | Por definir | ⏳ Pendiente |
+| Fase 6 | KPIs | Supabase | ⏳ Pendiente |
 
 ---
 
-## DECISIONES TÉCNICAS IMPORTANTES
+## SUPABASE — SETUP BUCKET
 
-- **Sin AI face prompt** — Claude ya no genera el prompt de rostro. El rostro es 100% manual: el usuario controla etnia, rasgos, proporciones via AION.
-- **Toggle = omit** — cuando un toggle está OFF, esas keys se omiten del payload de ComfyDeploy completamente. AION usa sus defaults internos para inputs faltantes.
-- **Upload Supabase antes de ComfyDeploy** — las imágenes de referencia se suben primero a Supabase Storage y se pasa la URL pública a ComfyDeploy (no se pueden pasar binarios directamente).
-- **`imagen final` hardcodeado** — siempre `"Nano Banana Pro"`, es el prefijo del archivo de output del nodo SaveImage en AION. No es configurable por el usuario.
-- **face_description para body prompt** — `buildFaceDescription()` construye el texto de descripción del rostro a partir de los inputs manuales del usuario (parámetros AION seleccionados + prompt libre) para pasarlo a Claude en el paso 2.
-- **43 COMBO params como ExternalEnum** — cada uno es un nodo `ComfyUIDeployExternalEnum` en el workflow AION. Las opciones deben pasarse como JSON array string.
-- **10 image slots como ExternalImage** — cada slot es un nodo `ComfyUIDeployExternalImage`. Se pasa la URL pública de Supabase.
-- **pipeline v3 legacy** — `/api/generate` (face con deployment `d3e4cb7d`) fue removido. Si se necesita el viejo rostro, no está disponible.
-- **Supabase bucket `zami-images`** — debe ser público. Policy SQL: `CREATE POLICY "anon insert" ON storage.objects FOR INSERT TO anon WITH CHECK (bucket_id = 'zami-images');`
-- **`iniciar.bat` hace `taskkill`** — mata cualquier proceso Node previo antes de arrancar. Evita el error "port in use".
-- **Polling cada 8 segundos** — ComfyDeploy tarda 1–5 minutos. El browser pregunta automáticamente hasta recibir estado terminal.
-- **Fase 4: 1 run por día = 4 imágenes** — el workflow `8d4702cb` genera 4 imágenes en un run. Se lanzan 5 runs en paralelo → 20 imágenes totales.
-- **Fase 4 — Outfit siempre variable** — los prompts NUNCA copian el outfit de las imágenes de referencia. El cuerpo es pasaporte biológico (proporciones), no plantilla de ropa.
-- **Campos editables en profile card** — `contenteditable="true"` en cada valor. El usuario edita directo en pantalla.
+Bucket `zami-images` en `https://supabase.com/dashboard/project/vtyuylgfjvleywupbdzl/storage/buckets`
+- Tipo: **Public**
+- Policy: `FOR ALL TO anon`
 
----
-
-## SUPABASE BUCKET — SETUP
-
-Si el bucket `zami-images` no existe o no está configurado:
-
-1. Ir a https://supabase.com → tu proyecto → Storage
-2. Crear bucket `zami-images`, marcar como **Public**
-3. En SQL Editor, ejecutar:
+Si hay que recrear:
 ```sql
--- Policy para que anon pueda hacer INSERT
-CREATE POLICY "anon insert" ON storage.objects
-FOR INSERT TO anon
+DROP POLICY IF EXISTS "anon all zami-images" ON storage.objects;
+CREATE POLICY "anon all zami-images" ON storage.objects
+FOR ALL TO anon
+USING (bucket_id = 'zami-images')
 WITH CHECK (bucket_id = 'zami-images');
 ```
-4. Copiar la `anon key` de Settings → API → Project API keys → `anon public`
-5. Pegarla en `.env` como `VITE_SUPABASE_ANON_KEY=`
 
 ---
 
 ## PROMPT DEL NODO COMFYDEPLOY — Fase 4 (deployment `8d4702cb`)
-
-Este texto se configura como instrucción base en el workflow de ComfyDeploy. Si se regenera o migra el deployment, debe replicarse exactamente.
 
 ```
 You are a professional UGC content photography engine for AI influencer accounts. You ALWAYS generate an image — never text, never explanations.
@@ -463,30 +396,34 @@ ONE photograph. Portrait orientation. Instagram-ready. Sexy, real, aspirational.
 
 ---
 
+## DECISIONES TÉCNICAS IMPORTANTES
+
+- **Sin AI face prompt** — El rostro es 100% manual vía AION.
+- **ExternalImage nodes directos** — el workflow AION v4 conecta `ExternalImage` directo al `AionThetaNode`. Sin `LoadImage` hardcodeados. Input `None` = AION lo ignora.
+- **Toggle = omit** — cuando un toggle está OFF, esas keys se omiten del payload completamente.
+- **Upload Supabase antes de ComfyDeploy** — imágenes de referencia van a Supabase primero, luego URL pública a ComfyDeploy.
+- **`imagen final` hardcodeado** — siempre `"Nano Banana Pro"`.
+- **9 image slots** — `eyes, eyebrows, nose, lips, forehead, jawline, hairline, skin, full_face`.
+- **`iniciar.bat` hace `taskkill`** — mata proceso Node previo antes de arrancar.
+- **Polling cada 8 segundos** — ComfyDeploy tarda 1–5 minutos.
+- **Fase 4: 1 run = 4 imágenes** — 5 runs en paralelo = 20 imágenes totales.
+- **No necesita npm install** — `server.cjs` usa solo módulos nativos de Node.js.
+
+---
+
 ## TROUBLESHOOTING
 
-**Error "Not found" en rutas del servidor:**
-El proceso node viejo sigue corriendo. Correr `.\iniciar.bat` de nuevo.
+**Error "Not found" en rutas:** El proceso node viejo sigue corriendo. Correr `.\iniciar.bat` de nuevo.
 
-**La imagen de rostro no aparece tras `success`:**
-Revisar la terminal — buscar `OUTPUTS:` para ver el JSON crudo de la API.
+**La imagen de rostro no aparece tras `success`:** Revisar terminal — buscar `OUTPUTS:`.
 
-**Upload de imagen falla:**
-- Verificar que `VITE_SUPABASE_ANON_KEY` esté en `.env`
-- Verificar que bucket `zami-images` sea público con policy INSERT para anon
-- Reiniciar servidor después de cambiar `.env`
+**Upload falla 403/404:**
+- Verificar `VITE_SUPABASE_ANON_KEY` en `.env`
+- Verificar bucket `zami-images` público con policy `FOR ALL TO anon`
+- Reiniciar servidor tras cambiar `.env`
 
-**AION genera rostro distinto a las imágenes de referencia:**
-Las imágenes de referencia se pasan pero el nodo interno AION controla el peso. No es configurable desde la API.
+**ComfyDeploy error en `/api/generate-face`:** Verificar `VITE_COMFYDEPLOY_AION_DEPLOYMENT_ID` en `.env` y deployment `c6e6b7f0` activo.
 
-**ComfyDeploy retorna error en `/api/generate-face`:**
-Verificar que `VITE_COMFYDEPLOY_AION_DEPLOYMENT_ID` esté en `.env` y que el deployment `c6e6b7f0` esté activo en ComfyDeploy.
+**El servidor no lee cambios del `.env`:** Siempre `.\iniciar.bat` después de editar `.env`.
 
-**Las imágenes de Fase 4 replican el outfit de la imagen de cuerpo:**
-El nodo del workflow `8d4702cb` en ComfyDeploy no tiene el system prompt actualizado. Ver sección "PROMPT DEL NODO COMFYDEPLOY" arriba.
-
-**El servidor no lee cambios del `.env`:**
-Siempre reiniciar con `.\iniciar.bat` después de editar el `.env`.
-
-**Regla PowerShell:** Siempre `.\iniciar.bat` con el `.\` — sin el punto barra falla.
-**Carpeta correcta:** `C:\Users\LENOVO\zami-ai-studio-dev`
+**Regla PowerShell:** Siempre `.\iniciar.bat` con `.\` — sin el punto barra falla.
