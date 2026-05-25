@@ -1,4 +1,4 @@
-# Zami AI Studio — Documentación Técnica v5 AION
+# Zami AI Studio — Documentación Técnica v7 AION
 
 ## REGLA ABSOLUTA — COMANDOS SIEMPRE COMPLETOS
 
@@ -43,6 +43,7 @@ El usuario configura el rostro manualmente vía AION (imágenes de referencia + 
 - `iniciar.bat` — lanzador Windows
 - `.env` — variables de entorno (nunca commitear)
 - `data/influencers.json` — persistencia local de influencers y su historial de semanas
+- `Foto inicio/Nano Banana Pro_00001_.png` — foto fija de la modelo del hero (sirve en `/hero-photo.png`)
 
 **Carpeta local:** `C:\Users\LENOVO\zami-ai-studio-dev`
 **Repositorio GitHub:** `https://github.com/Se7en198/zami-ai-studio-dev`
@@ -63,15 +64,80 @@ git push origin main
 
 ---
 
+## DISEÑO UI — SISTEMA VISUAL v7
+
+### Identidad visual
+- **Color acento:** Acid Lime `#C8FF00` — reemplazó fuchsia `#FF0080` en v7
+- **Color hover/dark:** `#a8d900` (lime más oscuro para estados hover)
+- **Fondo base:** `#0A0A0A` (casi negro)
+- **Superficie cards:** `#161616`
+- **Superficie 2:** `#111111`
+- **Tipografía display:** `Bebas Neue` (Google Fonts CDN) — headings, tabs, botones CTA
+- **Tipografía cuerpo:** system font stack (`-apple-system, BlinkMacSystemFont, 'Segoe UI'`)
+
+### Design tokens (`:root` en `server-ui.html`)
+```css
+--c-accent:      #C8FF00
+--c-accent-dim:  rgba(200,255,0,0.09)
+--c-accent-mid:  rgba(200,255,0,0.22)
+--c-accent-glow: rgba(200,255,0,0.14)
+--c-bg:          #0A0A0A
+--c-surface:     #161616
+--c-surface2:    #111111
+--c-border:      #2a2a2a
+--c-text:        #e8e8e8
+--c-muted:       #888888
+--c-success:     #4ade80
+--c-error:       #f87171
+--shadow-card:   0 2px 8px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.03)
+--transition-spring: 0.35s cubic-bezier(0.34, 1.56, 0.64, 1)
+```
+
+⚠️ **Regla de contraste:** todos los botones con fondo `#C8FF00` deben tener `color: #000`. Lime sobre blanco falla WCAG. Aplica a: `#btn-main`, `.btn-nueva`, `.btn-seleccionar-inf`, `.btn-generate-week`, `.mode-tab.active`.
+
+### Layout principal
+- **Dos columnas:** sidebar 260px fijo (izquierda) + workspace flex:1 scrollable (derecha)
+- **Sidebar:** logo ZAMMY GIRLS, grid de influencer cards (3 columnas), botón `+ NUEVA INFLUENCER` lime full-width al fondo
+- **Workspace:** heading Bebas Neue, form de creación, progress steps, result section, Fase 4
+
+### Landing Hero
+- Pantalla completa fija (`z-index: 1000`) — visible al cargar, se desvanece al hacer clic en "Crear influencer"
+- Fondo: `#C8FF00` (Acid Lime)
+- Texto de fondo: "ZAMMY" / "GIRLS" en Bebas Neue 34vw negro
+- Foto centrada: servida desde `/hero-photo.png` → `Foto inicio/Nano Banana Pro_00001_.png`
+- Botón CTA: negro con texto lime, bottom-right
+- Constante JS: `const HERO_PHOTO_URL = '/hero-photo.png'`
+
+### Formulario de creación (orden de campos v7)
+```
+1. TIPO DE FOTO   ← primero, full-width, default: "Studio 2×2 multi-view grid"
+2. NOMBRE | NICHO ← two-col
+3. Mode tabs      ← Creación Manual | ✦ Crear con Claude
+4. Toggles (Manual) o Textarea (Claude)
+5. Botón GENERAR
+```
+
+---
+
 ## CÓMO FUNCIONA EL SERVIDOR
 
 `iniciar.bat` mata cualquier proceso Node previo (`taskkill`) y lanza `node server.cjs`.
 El browser abre `http://127.0.0.1:3333` — siempre IPv4, nunca `localhost`.
 El servidor lee `.env` automáticamente al arrancar. No necesita `npm install`.
 
-### Pipeline AION v5 — Fase 1: Generación de Rostro (dos modos)
+### Ruta estática especial
+```
+GET /hero-photo.png
+→ Lee y sirve: Foto inicio/Nano Banana Pro_00001_.png
+   Cache-Control: public, max-age=86400
+```
+Esta ruta fue agregada en v6 para evitar usar URLs externas de S3 como foto del hero.
 
-La UI tiene un tab switcher con **dos modos de creación de rostro**. Ambos comparten los campos nombre, nicho y tipo de foto. El usuario elige el modo y hace clic en el botón principal. La UI muestra 4 pasos animados.
+### Pipeline AION v7 — Fase 1: Generación de Rostro (dos modos)
+
+La UI tiene un tab switcher con **dos modos de creación de rostro**. Ambos comparten los campos tipo de foto (primero), nombre y nicho. El usuario elige el modo y hace clic en el botón principal. La UI muestra 4 pasos animados.
+
+**Default de `photo_type` en UI:** `"Studio 2x2 portrait multi-view grid"` (preseleccionado desde v7)
 
 #### Modo A — Creación Manual (tab "Creación Manual")
 
@@ -124,7 +190,7 @@ El usuario escribe una descripción en lenguaje natural y opcionalmente adjunta 
 PASO 1 — Claude elige params → AION genera rostro
   Browser: POST /api/claude-guided-face {
     description: "mujer francesa, labios carnosos, ojos azules...",
-    photo_type:  "Studio white background",
+    photo_type:  "Studio 2x2 portrait multi-view grid",
     reference_images: [           ← opcional, hasta 4 imágenes
       { type: "image/jpeg", data: "<base64>" }
     ]
@@ -206,7 +272,7 @@ FASE 4 — Contenido Semanal (se repite cada semana por cada influencer)
 ### Workflow deployment AION
 - **Deployment ID:** `c6e6b7f0-e574-4aa8-9012-54e8507202e2`
 - **Input `imagen final`:** siempre hardcodeado como `"Nano Banana Pro"` (prefijo del archivo de output SaveImage)
-- **Input `photo_type`:** siempre enviado; default `"-- Not selected / System inferred --"`
+- **Input `photo_type`:** siempre enviado; UI default desde v7: `"Studio 2x2 portrait multi-view grid"`
 
 ### Arquitectura del workflow (v4 ExternalImage)
 El workflow usa nodos `ExternalImage (ComfyUI Deploy)` conectados directamente al `AionThetaNode`. No hay `LoadImage` hardcodeados ni `Fast Groups Muter` para control de API. AION detecta internamente qué inputs recibió y activa el modo correspondiente.
@@ -243,7 +309,7 @@ Content-Type: application/json
 {
   "deployment_id": "c6e6b7f0-e574-4aa8-9012-54e8507202e2",
   "inputs": {
-    "photo_type": "...",
+    "photo_type": "Studio 2x2 portrait multi-view grid",
     "imagen final": "Nano Banana Pro",
     "prompt": "...",              ← solo si toggle C ON
     "eyes": "https://...",        ← solo si toggle A ON y slot tiene imagen
@@ -341,6 +407,7 @@ POST https://api.anthropic.com/v1/messages
 | Método | Ruta | Body | Descripción |
 |---|---|---|---|
 | `GET` | `/` | — | Sirve server-ui.html |
+| `GET` | `/hero-photo.png` | — | Sirve `Foto inicio/Nano Banana Pro_00001_.png` (hero fija) |
 | `POST` | `/api/upload-image` | `{ name, data: base64, type }` | Sube imagen a Supabase Storage → `{ url }` |
 | `POST` | `/api/generate-face` | `{ photo_type, images?, params?, prompt? }` | AION face generation — Modo Manual |
 | `POST` | `/api/claude-guided-face` | `{ description, photo_type, reference_images? }` | Claude elige params → AION genera rostro — Modo Claude |
@@ -360,12 +427,13 @@ POST https://api.anthropic.com/v1/messages
 
 | Archivo | Función |
 |---|---|
-| `server.cjs` | Servidor local — pipeline completo |
-| `server-ui.html` | UI — 3 toggles + upload + 43 params + 4-step pipeline |
-| `iniciar.bat` | Lanzador Windows |
-| `.env` | Variables de entorno (no commitear) |
+| `server.cjs` | Servidor local — pipeline completo + ruta `/hero-photo.png` |
+| `server-ui.html` | UI completa — hero, studio, 3 toggles, 43 params, Fase 4 |
+| `iniciar.bat` | Lanzador Windows (taskkill + node server.cjs) |
+| `.env` | Variables de entorno (NO commitear) |
 | `.env.example` | Template de variables |
-| `data/influencers.json` | Persistencia local |
+| `data/influencers.json` | Persistencia local de influencers y semanas |
+| `Foto inicio/Nano Banana Pro_00001_.png` | Foto fija del hero landing (modelo principal) |
 | `CLAUDE.md` | Esta documentación |
 
 ---
@@ -471,6 +539,9 @@ ONE photograph. Portrait orientation. Instagram-ready. Sexy, real, aspirational.
 - **Polling cada 8 segundos** — ComfyDeploy tarda 1–5 minutos.
 - **Fase 4: 1 run = 4 imágenes** — 5 runs en paralelo = 20 imágenes totales.
 - **No necesita npm install** — `server.cjs` usa solo módulos nativos de Node.js.
+- **Hero photo local** — `/hero-photo.png` se sirve desde `Foto inicio/Nano Banana Pro_00001_.png`. Si la carpeta o el archivo no existe, el endpoint devuelve 404 y el hero muestra el placeholder.
+- **Lime sobre negro** — todos los botones con fondo `#C8FF00` deben tener `color: #000` explícito. Nunca `color: #fff` sobre lime.
+- **CSS cascade limpia** — cada selector tiene UNA sola regla definitiva. No duplicar `.mode-tab`, `.btn-nueva`, `label` etc. La especificidad `#influencers-panel .btn-nueva` se usa para separar el botón sidebar del posible botón panel antiguo.
 
 ---
 
@@ -479,6 +550,11 @@ ONE photograph. Portrait orientation. Instagram-ready. Sexy, real, aspirational.
 **Error "Not found" en rutas:** El proceso node viejo sigue corriendo. Correr `.\iniciar.bat` de nuevo.
 
 **La imagen de rostro no aparece tras `success`:** Revisar terminal — buscar `OUTPUTS:`.
+
+**Hero muestra placeholder en lugar de la modelo:**
+- Verificar que existe `Foto inicio/Nano Banana Pro_00001_.png`
+- La ruta tiene espacio: `path.join(__dirname, 'Foto inicio', 'Nano Banana Pro_00001_.png')`
+- Reiniciar servidor con `.\iniciar.bat`
 
 **Upload falla 403/404:**
 - Verificar `VITE_SUPABASE_ANON_KEY` en `.env`
@@ -490,3 +566,5 @@ ONE photograph. Portrait orientation. Instagram-ready. Sexy, real, aspirational.
 **El servidor no lee cambios del `.env`:** Siempre `.\iniciar.bat` después de editar `.env`.
 
 **Regla PowerShell:** Siempre `.\iniciar.bat` con `.\` — sin el punto barra falla.
+
+**Botones con texto blanco sobre lime:** Si algún botón nuevo tiene fondo `#C8FF00` y texto blanco, agregar `color: #000` explícito al selector CSS. Nunca confiar en herencia para esto.
