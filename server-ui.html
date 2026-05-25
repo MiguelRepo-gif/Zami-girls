@@ -7,10 +7,10 @@
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&display=swap" rel="stylesheet">
 <style>
   :root {
-    --c-accent:   #FF0080;
-    --c-accent-dim: rgba(255,0,128,0.12);
-    --c-accent-mid: rgba(255,0,128,0.28);
-    --c-accent-glow: rgba(255,0,128,0.18);
+    --c-accent:   #C8FF00;
+    --c-accent-dim: rgba(200,255,0,0.09);
+    --c-accent-mid: rgba(200,255,0,0.22);
+    --c-accent-glow: rgba(200,255,0,0.14);
     --c-bg:       #0A0A0A;
     --c-surface:  #161616;
     --c-surface2: #111111;
@@ -25,8 +25,8 @@
     --r-input:    10px;
     --r-btn:      10px;
     --shadow-card: 0 2px 8px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.03);
-    --shadow-card-hover: 0 4px 20px rgba(0,0,0,0.7), 0 0 0 1px rgba(255,0,128,0.08);
-    --shadow-glow: 0 0 32px rgba(255,0,128,0.22);
+    --shadow-card-hover: 0 4px 20px rgba(0,0,0,0.7), 0 0 0 1px rgba(200,255,0,0.08);
+    --shadow-glow: 0 0 32px rgba(200,255,0,0.22);
     --transition-fast: 0.15s ease;
     --transition-spring: 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
   }
@@ -56,11 +56,11 @@
     font-size: 2.4rem; color: #fff; line-height: 0.85;
     display: block; letter-spacing: 0.04em;
   }
-  .sidebar-logo-line { width: 36px; height: 3px; background: #FF0080; margin-top: 10px; }
+  .sidebar-logo-line { width: 36px; height: 3px; background: #C8FF00; margin-top: 10px; }
   .influencers-panel-header { display: none; }
   .influencers-grid {
     flex: 1; padding: 14px 12px;
-    display: grid; grid-template-columns: 1fr 1fr; gap: 8px;
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px;
     align-content: start;
   }
   .influencer-card { border-radius: 8px; }
@@ -74,11 +74,11 @@
   #influencers-panel .btn-nueva {
     font-family: 'Bebas Neue', 'Arial Black', Impact, sans-serif;
     font-size: 1rem; letter-spacing: 0.1em; text-transform: uppercase;
-    background: #FF0080; color: #000; border: none;
+    background: #C8FF00; color: #000; border: none;
     border-radius: 0; width: 100%; padding: 18px 16px; margin-top: auto;
     flex: none;
   }
-  #influencers-panel .btn-nueva:hover:not(:disabled) { background: #e0006f; color: #000; }
+  #influencers-panel .btn-nueva:hover:not(:disabled) { background: #a8d900; color: #000; }
 
   /* ── Right Workspace ──────────────────────────────────── */
   #workspace {
@@ -98,10 +98,10 @@
   #btn-main {
     font-family: 'Bebas Neue', 'Arial Black', Impact, sans-serif;
     font-size: 1.3rem; letter-spacing: 0.12em; text-transform: uppercase;
-    padding: 18px 20px; border-radius: 6px; background: #FF0080;
-    box-shadow: 0 0 28px rgba(255,0,128,0.25);
+    padding: 18px 20px; border-radius: 6px; background: #C8FF00;
+    color: #000; box-shadow: 0 0 28px rgba(200,255,0,0.20);
   }
-  #btn-main:hover:not(:disabled) { background: #e0006f; }
+  #btn-main:hover:not(:disabled) { background: #a8d900; color: #000; }
 
   /* ── Phase 4 header ───────────────────────────────────── */
   .phase-header h2 {
@@ -109,11 +109,11 @@
     font-size: 2rem; letter-spacing: 0.06em; font-weight: 400;
   }
   .phase-badge {
-    background: rgba(255,0,128,0.15); border-color: rgba(255,0,128,0.4); color: #FF0080;
+    background: rgba(200,255,0,0.15); border-color: rgba(200,255,0,0.4); color: #C8FF00;
   }
   .badge {
-    display: inline-block; background: rgba(255,0,128,0.13); border: 1px solid rgba(255,0,128,0.27);
-    color: #FF0080; font-size: 0.72rem; font-weight: 700; padding: 2px 8px;
+    display: inline-block; background: rgba(200,255,0,0.13); border: 1px solid rgba(200,255,0,0.27);
+    color: #C8FF00; font-size: 0.72rem; font-weight: 700; padding: 2px 8px;
     border-radius: 20px; letter-spacing: 0.06em; text-transform: uppercase;
     vertical-align: middle; margin-left: 8px;
   }
@@ -124,12 +124,12 @@
   }
   .row { display: flex; gap: 12px; margin-top: 14px; align-items: flex-end }
   button {
-    flex: 1; padding: 11px 20px; background: #FF0080;
+    flex: 1; padding: 11px 20px; background: #C8FF00;
     border: none; border-radius: 10px; color: #fff;
     font-weight: 700; font-size: 0.9rem; cursor: pointer;
     transition: background .15s, opacity .15s;
   }
-  button:hover:not(:disabled) { background: #e0006f }
+  button:hover:not(:disabled) { background: #a8d900 }
   button:disabled { opacity: .45; cursor: not-allowed }
   input[type=text], select, textarea {
     width: 100%; background: #0d0d0d; border: 1px solid #2a2a2a;
@@ -137,7 +137,7 @@
     padding: 11px 14px; font-family: inherit; outline: none;
     transition: border-color .15s;
   }
-  input[type=text]:focus, select:focus, textarea:focus { border-color: #FF0080 }
+  input[type=text]:focus, select:focus, textarea:focus { border-color: #C8FF00 }
   select { cursor: pointer }
   select option { background: #1a1a1a }
   textarea { resize: vertical; min-height: 80px; line-height: 1.5 }
@@ -168,8 +168,8 @@
     width: 18px; height: 18px; border-radius: 50%; background: #555;
     transition: left .2s, background .2s;
   }
-  .toggle-switch.on { background: rgba(255,0,128,0.2); border: 1px solid rgba(255,0,128,0.4) }
-  .toggle-switch.on::after { left: 23px; background: #FF0080 }
+  .toggle-switch.on { background: rgba(200,255,0,0.2); border: 1px solid rgba(200,255,0,0.4) }
+  .toggle-switch.on::after { left: 23px; background: #C8FF00 }
   .toggle-body { background: #0d0d0d }
   .toggle-body.open { border-top: 1px solid #2a2a2a; }
 
@@ -181,10 +181,10 @@
     cursor: pointer; transition: border-color .15s; position: relative; min-height: 120px;
     justify-content: center; text-align: center;
   }
-  .img-slot:hover { border-color: rgba(255,0,128,0.4) }
+  .img-slot:hover { border-color: rgba(200,255,0,0.4) }
   .img-slot.loaded { border-color: #4ade8066; border-style: solid }
-  .img-slot.uploading { border-color: rgba(255,0,128,0.27); animation: pulse-border 1s ease-in-out infinite }
-  @keyframes pulse-border { 0%, 100% { border-color: rgba(255,0,128,0.13) } 50% { border-color: rgba(255,0,128,0.53) } }
+  .img-slot.uploading { border-color: rgba(200,255,0,0.27); animation: pulse-border 1s ease-in-out infinite }
+  @keyframes pulse-border { 0%, 100% { border-color: rgba(200,255,0,0.13) } 50% { border-color: rgba(200,255,0,0.53) } }
   .img-slot input[type=file] { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100% }
   .img-slot-preview { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 7px; display: none }
   .img-slot.loaded .img-slot-preview { display: block }
@@ -204,12 +204,12 @@
 
   /* ── Param Groups ───────────────────────────────────── */
   .param-group { margin-bottom: 16px }
-  .param-group-title { font-size: 0.72rem; font-weight: 700; color: #FF0080; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 8px }
+  .param-group-title { font-size: 0.72rem; font-weight: 700; color: #C8FF00; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 8px }
   .param-field { display: flex; flex-direction: column; gap: 4px }
   .param-label { font-size: 0.7rem; color: #666; text-transform: uppercase; letter-spacing: 0.04em }
   .param-select { background: #111; border: 1px solid #222; border-radius: 8px; color: #ccc; font-size: 0.82rem; padding: 7px 10px; width: 100% }
-  .param-select:focus { border-color: rgba(255,0,128,0.4) }
-  .param-select.selected { border-color: rgba(255,0,128,0.53); color: #fff }
+  .param-select:focus { border-color: rgba(200,255,0,0.4) }
+  .param-select.selected { border-color: rgba(200,255,0,0.53); color: #fff }
 
   /* ── Progress Steps ─────────────────────────────────── */
   .steps {
@@ -223,7 +223,7 @@
     display: flex; align-items: center; justify-content: center; flex-shrink: 0;
     font-size: 0.72rem; font-weight: 700; color: #444; margin-top: 1px;
   }
-  .step.active .step-dot { border-color: #FF0080; color: #FF0080; animation: pulse 1.2s ease-in-out infinite }
+  .step.active .step-dot { border-color: #C8FF00; color: #C8FF00; animation: pulse 1.2s ease-in-out infinite }
   .step.done .step-dot  { border-color: #4ade80; background: #4ade8020; color: #4ade80 }
   .step.error .step-dot { border-color: #f87171; background: #f8717120; color: #f87171 }
   @keyframes pulse { 0%, 100% { opacity: 1 } 50% { opacity: 0.4 } }
@@ -250,17 +250,17 @@
   .profile-photos img { width: 50%; height: 280px; object-fit: cover; object-position: top }
   .profile-hero-info { flex: 1; padding: 28px 24px; display: flex; flex-direction: column; justify-content: center; gap: 8px }
   .profile-name { font-size: 1.8rem; font-weight: 800; color: #fff; margin: 0 }
-  .profile-handle { font-size: 0.95rem; color: #FF0080; font-weight: 600 }
+  .profile-handle { font-size: 0.95rem; color: #C8FF00; font-weight: 600 }
   .profile-meta { font-size: 0.82rem; color: #666 }
-  .profile-niche { display: inline-block; background: rgba(255,0,128,0.13); border: 1px solid rgba(255,0,128,0.27); color: #FF0080; font-size: 0.72rem; font-weight: 700; padding: 3px 12px; border-radius: 20px; text-transform: uppercase; letter-spacing: 0.05em; margin-top: 4px; width: fit-content }
+  .profile-niche { display: inline-block; background: rgba(200,255,0,0.13); border: 1px solid rgba(200,255,0,0.27); color: #C8FF00; font-size: 0.72rem; font-weight: 700; padding: 3px 12px; border-radius: 20px; text-transform: uppercase; letter-spacing: 0.05em; margin-top: 4px; width: fit-content }
   .profile-sections { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 1px; background: #222; border-top: 1px solid #222 }
   .profile-section { background: #161616; padding: 18px 20px }
-  .section-title { font-size: 0.78rem; font-weight: 700; color: #FF0080; text-transform: uppercase; letter-spacing: 0.06em; margin: 0 0 12px; padding-bottom: 8px; border-bottom: 1px solid #2a2a2a }
+  .section-title { font-size: 0.78rem; font-weight: 700; color: #C8FF00; text-transform: uppercase; letter-spacing: 0.06em; margin: 0 0 12px; padding-bottom: 8px; border-bottom: 1px solid #2a2a2a }
   .profile-field { display: flex; flex-direction: column; margin-bottom: 10px }
   .field-label { font-size: 0.68rem; font-weight: 700; color: #555; text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 2px }
   .field-value { font-size: 0.85rem; color: #ccc; line-height: 1.5; border-radius: 6px; padding: 4px 6px; min-height: 1.5em; outline: none; transition: background .15s, color .15s; cursor: text; word-break: break-word }
   .field-value:hover { background: #1e1e1e }
-  .field-value:focus { background: #1a1a1a; color: #fff; box-shadow: 0 0 0 1px rgba(255,0,128,0.27) }
+  .field-value:focus { background: #1a1a1a; color: #fff; box-shadow: 0 0 0 1px rgba(200,255,0,0.27) }
   .field-value.sub { color: #aaa; padding-left: 12px }
   .edit-hint { font-size: 0.7rem; color: #444; text-align: right; padding: 8px 20px 4px }
   .btn-copy { margin-top: 12px; flex: unset; padding: 9px 20px; background: #2a2a2a; font-size: 0.82rem }
@@ -275,7 +275,7 @@
   .influencers-panel-title { font-size: 0.95rem; font-weight: 700; color: #fff }
   .influencers-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 12px }
   .influencer-card { background: #111; border: 1px solid #2a2a2a; border-radius: 12px; overflow: hidden; cursor: pointer; transition: border-color .15s, transform .1s }
-  .influencer-card:hover { border-color: rgba(255,0,128,0.53); transform: translateY(-2px) }
+  .influencer-card:hover { border-color: rgba(200,255,0,0.53); transform: translateY(-2px) }
   .influencer-card.active { border-color: #4ade80 }
   .influencer-card-img { width: 100%; aspect-ratio: 1; object-fit: cover; object-position: top; display: block }
   .influencer-card-img-placeholder { width: 100%; aspect-ratio: 1; background: #1a1a1a; display: flex; align-items: center; justify-content: center; color: #333; font-size: 2rem }
@@ -283,13 +283,13 @@
   .influencer-card-name { font-size: 0.85rem; font-weight: 700; color: #fff; margin-bottom: 2px }
   .influencer-card-nicho { font-size: 0.72rem; color: #888; margin-bottom: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis }
   .influencer-card-weeks { font-size: 0.68rem; color: #555 }
-  .btn-seleccionar-inf { width: 100%; margin-top: 8px; padding: 6px; font-size: 0.75rem; background: #FF0080; border-radius: 6px; flex: unset }
+  .btn-seleccionar-inf { width: 100%; margin-top: 8px; padding: 6px; font-size: 0.75rem; background: #C8FF00; color: #000; border-radius: 6px; flex: unset }
   .btn-seleccionar-inf.active { background: #4ade80; color: #000 }
 
   /* ── Fase 4 ─────────────────────────────────────────── */
   .phase-header { display: flex; align-items: center; gap: 10px; margin: 36px 0 16px }
   .phase-header h2 { font-size: 1.05rem; font-weight: 700; color: #fff }
-  .phase-badge { background: rgba(255,0,128,0.13); border: 1px solid rgba(255,0,128,0.27); color: #FF0080; font-size: 0.7rem; font-weight: 700; padding: 2px 10px; border-radius: 20px; letter-spacing: 0.06em; text-transform: uppercase }
+  .phase-badge { background: rgba(200,255,0,0.13); border: 1px solid rgba(200,255,0,0.27); color: #C8FF00; font-size: 0.7rem; font-weight: 700; padding: 2px 10px; border-radius: 20px; letter-spacing: 0.06em; text-transform: uppercase }
   .persona-thumb { display: flex; flex-direction: column; align-items: center; gap: 4px }
   .persona-thumb img { width: 72px; height: 72px; object-fit: cover; border-radius: 8px; border: 2px solid #4ade80 }
   .persona-thumb .thumb-empty { width: 72px; height: 72px; border-radius: 8px; border: 2px dashed #333; display: flex; align-items: center; justify-content: center; color: #444; font-size: 0.7rem; text-align: center }
@@ -299,25 +299,25 @@
   .day-card { background: #161616; border: 1px solid #2a2a2a; border-radius: 14px; overflow: hidden }
   .day-card-header { background: #1a1a1a; padding: 10px 14px; display: flex; align-items: center; justify-content: space-between; border-bottom: 1px solid #2a2a2a }
   .day-name { font-size: 0.85rem; font-weight: 800; color: #fff; text-transform: uppercase; letter-spacing: 0.06em }
-  .post-type-badge { background: rgba(255,0,128,0.13); border: 1px solid rgba(255,0,128,0.27); color: #FF0080; font-size: 0.72rem; font-weight: 700; padding: 2px 8px; border-radius: 20px; text-transform: uppercase }
+  .post-type-badge { background: rgba(200,255,0,0.13); border: 1px solid rgba(200,255,0,0.27); color: #C8FF00; font-size: 0.72rem; font-weight: 700; padding: 2px 8px; border-radius: 20px; text-transform: uppercase }
   .day-card-body { padding: 12px 14px }
   .day-scene, .day-caption { font-size: 0.78rem; color: #888; margin-bottom: 8px; line-height: 1.5; border-radius: 6px; padding: 6px 8px; background: #0d0d0d; outline: none; width: 100%; cursor: text; display: block }
-  .day-scene:focus, .day-caption:focus { background: #1a1a1a; color: #ddd; box-shadow: 0 0 0 1px rgba(255,0,128,0.27) }
+  .day-scene:focus, .day-caption:focus { background: #1a1a1a; color: #ddd; box-shadow: 0 0 0 1px rgba(200,255,0,0.27) }
   .day-caption { color: #aaa; font-size: 0.8rem }
   .variation-list { display: flex; flex-direction: column; gap: 8px }
   .variation-item { border: 1px solid #1e1e1e; border-radius: 8px; overflow: hidden }
   .variation-header { display: flex; align-items: center; gap: 8px; padding: 6px 10px; background: #111 }
   .shot-type-tag { font-size: 0.62rem; font-weight: 700; color: #666; text-transform: uppercase; letter-spacing: 0.04em; background: #1e1e1e; padding: 2px 7px; border-radius: 20px }
   .variation-prompt { font-size: 0.72rem; color: #666; padding: 7px 10px; line-height: 1.5; background: #0d0d0d; min-height: 52px; outline: none; cursor: text; width: 100%; display: block }
-  .variation-prompt:focus { background: #111; color: #bbb; box-shadow: inset 0 0 0 1px rgba(255,0,128,0.13) }
+  .variation-prompt:focus { background: #111; color: #bbb; box-shadow: inset 0 0 0 1px rgba(200,255,0,0.13) }
   .variation-image-slot { position: relative; background: #111; border-top: 1px solid #1a1a1a; min-height: 70px; display: flex; align-items: center; justify-content: center }
   .variation-image-slot img { width: 100%; aspect-ratio: 16/9; object-fit: cover; display: block; cursor: pointer }
-  .slot-spinner { width: 18px; height: 18px; border: 2px solid #2a2a2a; border-top-color: #FF0080; border-radius: 50%; animation: spin .8s linear infinite }
+  .slot-spinner { width: 18px; height: 18px; border: 2px solid #2a2a2a; border-top-color: #C8FF00; border-radius: 50%; animation: spin .8s linear infinite }
   .slot-placeholder { font-size: 0.68rem; color: #333; text-align: center }
   @keyframes spin { to { transform: rotate(360deg) } }
   .btn-download { position: absolute; bottom: 5px; right: 5px; padding: 3px 9px; background: rgba(0,0,0,.75); border: 1px solid #444; border-radius: 5px; color: #ccc; font-size: 0.65rem; font-weight: 600; cursor: pointer; flex: unset; backdrop-filter: blur(4px); transition: background .15s }
-  .btn-download:hover { background: rgba(232,93,138,.8); border-color: #FF0080; color: #fff }
-  .btn-generate-week { margin-top: 18px; width: 100%; padding: 13px; font-size: 0.95rem; background: linear-gradient(135deg, #FF0080, #a855f7); border-radius: 12px; letter-spacing: 0.02em; flex: unset }
+  .btn-download:hover { background: rgba(232,93,138,.8); border-color: #C8FF00; color: #fff }
+  .btn-generate-week { margin-top: 18px; width: 100%; padding: 13px; font-size: 0.95rem; background: #C8FF00; color: #000; border-radius: 12px; letter-spacing: 0.02em; flex: unset }
   .btn-save-week { margin-top: 10px; flex: unset; padding: 9px 20px; background: #4ade8033; border: 1px solid #4ade8066; color: #4ade80; font-size: 0.82rem; border-radius: 10px; width: 100% }
   .btn-save-week:hover:not(:disabled) { background: #4ade8055 }
   .deployment-id { font-size: 0.72rem; color: #333; margin-top: 28px; text-align: center }
@@ -334,14 +334,14 @@
     letter-spacing: 0.08em; font-size: 0.95rem;
     transition: background .15s, color .15s;
   }
-  .mode-tab.active { background: #FF0080; color: #000; border: none; }
+  .mode-tab.active { background: #C8FF00; color: #000; border: none; }
   .mode-tab:hover:not(.active):not(:disabled) { color: #ccc; background: #1a1a1a }
 
   /* ── Claude Mode Section ─────────────────────────────── */
   .claude-ref-slots { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 10px; margin-top: 8px }
   .claude-hint { font-size: 0.75rem; color: #555; background: #111; border: 1px solid #1e1e1e; border-radius: 8px; padding: 8px 12px; margin-top: 12px; line-height: 1.5 }
   .claude-params-summary { background: #111; border: 1px solid #1e1e1e; border-radius: 10px; padding: 12px 14px; margin-top: 12px }
-  .claude-params-summary-title { font-size: 0.72rem; font-weight: 700; color: #FF0080; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px }
+  .claude-params-summary-title { font-size: 0.72rem; font-weight: 700; color: #C8FF00; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px }
   .claude-params-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 3px 10px }
   .claude-param-item { font-size: 0.72rem; color: #666 }
   .claude-param-item span { color: #bbb }
@@ -352,7 +352,7 @@
 
   /* ── Workspace: subtle brand gradient so it doesn't feel flat ── */
   #workspace {
-    background: radial-gradient(ellipse 80% 40% at 60% -10%, rgba(255,0,128,0.05) 0%, transparent 70%), #0A0A0A;
+    background: radial-gradient(ellipse 80% 40% at 60% -10%, rgba(200,255,0,0.05) 0%, transparent 70%), #0A0A0A;
   }
 
   /* ── Sidebar logo: gradient strip ── */
@@ -383,7 +383,7 @@
     transition: box-shadow var(--transition-spring), transform var(--transition-spring), border-color var(--transition-fast);
   }
   .influencer-card:hover {
-    box-shadow: 0 6px 24px rgba(0,0,0,0.65), 0 0 0 1px rgba(255,0,128,0.2);
+    box-shadow: 0 6px 24px rgba(0,0,0,0.65), 0 0 0 1px rgba(200,255,0,0.2);
     transform: translateY(-3px) scale(1.01);
   }
   .influencer-card.active {
@@ -403,8 +403,8 @@
 
   /* ── Step dot pulse uses ring instead of opacity blink ── */
   @keyframes pulse {
-    0%, 100% { box-shadow: 0 0 0 0 rgba(255,0,128,0.55); }
-    60%       { box-shadow: 0 0 0 8px rgba(255,0,128,0); }
+    0%, 100% { box-shadow: 0 0 0 0 rgba(200,255,0,0.55); }
+    60%       { box-shadow: 0 0 0 8px rgba(200,255,0,0); }
   }
 
   /* ── Step progress: connecting line ── */
@@ -447,7 +447,7 @@
   input[type=text]:hover, select:hover, textarea:hover { border-color: #3a3a3a; }
   input[type=text]:focus, select:focus, textarea:focus {
     border-color: var(--c-accent);
-    box-shadow: 0 0 0 3px rgba(255,0,128,0.08);
+    box-shadow: 0 0 0 3px rgba(200,255,0,0.08);
     outline: none;
   }
 
@@ -457,7 +457,7 @@
   }
   #btn-main:hover:not(:disabled) {
     transform: translateY(-2px) scale(1.02);
-    box-shadow: 0 6px 32px rgba(255,0,128,0.35);
+    box-shadow: 0 6px 32px rgba(200,255,0,0.35);
   }
   #btn-main:active:not(:disabled) { transform: scale(0.97); }
 
@@ -486,12 +486,12 @@
 
   /* ── Image upload slots ── */
   .img-slot { background: #111; transition: background var(--transition-fast), border-color var(--transition-fast), transform var(--transition-spring); }
-  .img-slot:hover { background: rgba(255,0,128,0.04); border-color: rgba(255,0,128,0.5); transform: scale(1.03); }
+  .img-slot:hover { background: rgba(200,255,0,0.04); border-color: rgba(200,255,0,0.5); transform: scale(1.03); }
   .img-slot-icon { color: #444; font-size: 1.8rem; }
   .img-slot.uploading::after {
     content: ''; position: absolute; top: 50%; left: 50%;
     width: 22px; height: 22px;
-    border: 2px solid rgba(255,0,128,0.2); border-top-color: var(--c-accent);
+    border: 2px solid rgba(200,255,0,0.2); border-top-color: var(--c-accent);
     border-radius: 50%; animation: spin .8s linear infinite;
     transform: translate(-50%, -50%); z-index: 2;
   }
@@ -504,11 +504,11 @@
   .param-group-title { padding-bottom: 8px; border-bottom: 1px solid #222; margin-bottom: 10px; }
 
   /* ── Day card header: accent bottom border ── */
-  .day-card-header { border-bottom: 2px solid rgba(255,0,128,0.15); }
+  .day-card-header { border-bottom: 2px solid rgba(200,255,0,0.15); }
 
   /* ── Profile field values ── */
-  .field-value { border-bottom: 1px dashed rgba(255,0,128,0.15); transition: background var(--transition-fast), border-color var(--transition-fast); }
-  .field-value:hover { border-bottom-color: rgba(255,0,128,0.4); }
+  .field-value { border-bottom: 1px dashed rgba(200,255,0,0.15); transition: background var(--transition-fast), border-color var(--transition-fast); }
+  .field-value:hover { border-bottom-color: rgba(200,255,0,0.4); }
 
   /* ── Influencer panel button active ── */
   .btn-seleccionar-inf.active { box-shadow: 0 0 8px rgba(74,222,128,0.25); }
@@ -559,10 +559,41 @@
     .toggle-body { transition: none !important; }
   }
 
+  /* ── Claude tab: borde lime sutil para diferenciarlo visualmente ── */
+  #tab-claude:not(.active) {
+    border: 1px solid rgba(200,255,0,0.18);
+    color: #777;
+  }
+  #tab-claude:not(.active):hover {
+    border-color: rgba(200,255,0,0.4);
+    color: #C8FF00;
+  }
+
+  /* ── Grey scale: normalizar a 4 niveles ── */
+  .step-detail { color: #666; -webkit-line-clamp: 3; }
+  .day-scene, .variation-prompt { color: #777; }
+  .toggle-hint, .claude-hint { color: #555; font-size: 0.72rem; }
+  .claude-param-item { color: #555; }
+
+  /* ── Micro-tipografía: mínimo 0.72rem ── */
+  .param-label  { font-size: 0.72rem; }
+  .field-label  { font-size: 0.72rem; }
+  .phase-badge, .post-type-badge, .badge { font-size: 0.72rem; }
+
+  /* ── Sidebar 3-col: ajustar card name para espacio reducido ── */
+  .influencer-card-info { padding: 5px 6px; }
+  .influencer-card-name { font-size: 0.8rem; }
+  .influencer-card-nicho { font-size: 0.65rem; }
+  .influencer-card-weeks { display: none; }
+  .btn-seleccionar-inf { font-size: 0.68rem; padding: 5px 4px; }
+
+  /* ── Workspace: top padding reducido — h1 más cerca del form ── */
+  #workspace { padding: 28px 40px 40px; }
+
   /* ── Landing Hero ─────────────────────────────────────── */
   #landing-hero {
     position: fixed; inset: 0; z-index: 1000;
-    background: #FF0080;
+    background: #C8FF00;
     overflow: hidden;
     transition: opacity 0.5s ease, transform 0.5s ease;
   }
@@ -616,7 +647,7 @@
     display: block; margin-top: 4px;
   }
   .btn-hero-cta {
-    background: #000; color: #FF0080;
+    background: #000; color: #C8FF00;
     border: none; padding: 16px 40px;
     font-family: 'Bebas Neue', 'Arial Black', Impact, sans-serif;
     font-size: 1.15rem; letter-spacing: 0.12em;
@@ -624,7 +655,7 @@
     border-radius: 0; flex: unset;
     transition: background 0.15s;
   }
-  .btn-hero-cta:hover:not(:disabled) { background: #1a1a1a; color: #FF0080 }
+  .btn-hero-cta:hover:not(:disabled) { background: #1a1a1a; color: #C8FF00 }
 </style>
 </head>
 <body>
@@ -667,26 +698,13 @@
   <!-- ── WORKSPACE ────────────────────────────────────────────────────────────── -->
   <div id="workspace">
     <h1>Crear Influencer <span class="badge">AION</span></h1>
-    <p class="subtitle">Configura el rostro de tu próxima modelo con IA.</p>
 
   <!-- ── CREAR INFLUENCER ────────────────────────────────────────────────────── -->
   <div id="create-section">
     <div class="controls">
 
-      <!-- Nombre + Nicho -->
-      <div class="two-col">
-        <div>
-          <label for="nombre">Nombre de la influencer</label>
-          <input type="text" id="nombre" placeholder="Ej: Valentina, Carla, Sofia...">
-        </div>
-        <div>
-          <label for="nicho">Nicho de contenido</label>
-          <input type="text" id="nicho" placeholder="Ej: Fitness, Gamer, Moda, Lifestyle...">
-        </div>
-      </div>
-
-      <!-- Photo Type — siempre visible -->
-      <div style="margin-top:12px">
+      <!-- Tipo de foto — PRIMERO (más impacto en el output) -->
+      <div>
         <label for="photo-type">Tipo de foto</label>
         <select id="photo-type">
           <option value="-- Not selected / System inferred --">-- No seleccionado / Sistema infiere --</option>
@@ -694,10 +712,22 @@
           <option value="Studio neutral grey background">Studio — fondo gris neutro</option>
           <option value="Studio black background">Studio — fondo negro</option>
           <option value="Natural light portrait">Retrato luz natural</option>
-          <option value="Studio 2x2 portrait multi-view grid">Studio 2×2 multi-view grid</option>
+          <option value="Studio 2x2 portrait multi-view grid" selected>Studio 2×2 multi-view grid</option>
           <option value="Studio character sheet 16:9 structured multi-view layout">Character sheet 16:9 multi-view</option>
           <option value="Studio 16:9 three-panel portrait triptych">Tríptico 16:9 tres paneles</option>
         </select>
+      </div>
+
+      <!-- Nombre + Nicho -->
+      <div class="two-col" style="margin-top:14px">
+        <div>
+          <label for="nombre">Nombre</label>
+          <input type="text" id="nombre" placeholder="Ej: Valentina, Carla, Sofia...">
+        </div>
+        <div>
+          <label for="nicho">Nicho</label>
+          <input type="text" id="nicho" placeholder="Ej: Fitness, Gamer, Moda...">
+        </div>
       </div>
 
       <!-- Mode Tabs -->
@@ -717,7 +747,6 @@
           </div>
           <div class="toggle-body" id="body-images">
             <div class="img-slots" id="img-slots"></div>
-            <div class="notice">Las imágenes se suben a Supabase Storage y se pasan al workflow AION como referencia visual. Requiere <code>VITE_SUPABASE_URL</code> y <code>VITE_SUPABASE_ANON_KEY</code> en el .env y un bucket público llamado <code>zami-images</code>.</div>
           </div>
         </div>
 
@@ -872,9 +901,6 @@
     </button>
   </div>
 
-  <div class="deployment-id">
-    AION: c6e6b7f0 &nbsp;|&nbsp; cuerpo: cabf22a3 &nbsp;|&nbsp; perfil: claude-sonnet-4-6 &nbsp;|&nbsp; fase 4: 8d4702cb
-  </div>
   </div><!-- end workspace -->
 </div><!-- end container -->
 
