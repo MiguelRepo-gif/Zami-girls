@@ -8,7 +8,7 @@ Cada vez que des un comando git, bat o node — SIEMPRE incluye el cd al inicio:
 
 ```
 cd C:\Users\LENOVO\zami-ai-studio-dev
-git pull origin main
+git pull --ff-only
 .\iniciar.bat
 ```
 
@@ -22,7 +22,7 @@ Cuando el usuario diga **"vamos a trabajar"**, **"iniciemos"**, **"empecemos"**,
 
 ```
 cd C:\Users\LENOVO\zami-ai-studio-dev
-git pull origin main
+git pull --ff-only
 .\iniciar.bat
 ```
 
@@ -47,19 +47,20 @@ El usuario configura el rostro manualmente vía AION (imágenes de referencia + 
 
 **Carpeta local:** `C:\Users\LENOVO\zami-ai-studio-dev`
 **Repositorio GitHub:** `https://github.com/Se7en198/zami-ai-studio-dev`
-**Rama activa:** `main`
+**Rama estable:** `main`
+**Rama QA:** `qa-hardening-safe` (laboratorio seguro antes de mezclar a `main`)
 
 **Sincronizar cambios:**
 ```
 cd C:\Users\LENOVO\zami-ai-studio-dev
-git pull origin main
+git pull --ff-only
 ```
 **Publicar cambios a GitHub:**
 ```
 cd C:\Users\LENOVO\zami-ai-studio-dev
 git add -p
 git commit -m "descripción del cambio"
-git push origin main
+git push origin HEAD
 ```
 
 ---
@@ -124,6 +125,8 @@ git push origin main
 `iniciar.bat` mata cualquier proceso Node previo (`taskkill`) y lanza `node server.cjs`.
 El browser abre `http://127.0.0.1:3333` — siempre IPv4, nunca `localhost`.
 El servidor lee `.env` automáticamente al arrancar. No necesita `npm install`.
+
+**Smoke test seguro:** la UI y `/hero-photo.png` pueden probarse sin gastar APIs. Las rutas de generación, upload y contenido llaman servicios externos y requieren `.env` real.
 
 ### Ruta estática especial
 ```

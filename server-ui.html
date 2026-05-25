@@ -583,6 +583,12 @@
   .influencer-card-nicho { font-size: 0.65rem; }
   .influencer-card-weeks { display: none; }
   .btn-seleccionar-inf { font-size: 0.68rem; padding: 5px 4px; }
+  @media (min-width: 681px) {
+    #influencers-panel .influencers-grid { grid-template-columns: repeat(3, 1fr); }
+    #influencers-panel .influencer-card { border-radius: 8px; }
+    #influencers-panel .influencer-card-img,
+    #influencers-panel .influencer-card-img-placeholder { aspect-ratio: 2/3; }
+  }
 
   /* ── Workspace: top padding reducido — h1 más cerca del form ── */
   #workspace { padding: 28px 40px 40px; }
@@ -1110,6 +1116,7 @@ async function handleImageFile(slotId, input) {
   } catch (err) {
     slotEl.classList.remove('uploading')
     statusEl.textContent = `Error: ${err.message}`
+    input.value = ''
     console.error('Upload error:', err)
   }
 }
@@ -1122,6 +1129,8 @@ function removeImage(slotId, event) {
   delete uploadedImages[slotId]
   previewEl.src = ''
   slotEl.classList.remove('loaded')
+  const input = slotEl.querySelector('input[type=file]')
+  if (input) input.value = ''
   statusEl.textContent = 'Arrastra o haz clic'
   updateImageHint()
 }
@@ -1234,6 +1243,7 @@ async function handleClaudeRefImage(index, input) {
   } catch (err) {
     slotEl.classList.remove('uploading')
     statusEl.textContent = 'Error'
+    input.value = ''
     console.error('Claude ref image error:', err)
   }
 }
@@ -1247,6 +1257,8 @@ function removeClaudeRefImage(index, event) {
   if (previewEl._objUrl) { URL.revokeObjectURL(previewEl._objUrl); previewEl._objUrl = null }
   previewEl.src = ''
   slotEl.classList.remove('loaded')
+  const input = slotEl.querySelector('input[type=file]')
+  if (input) input.value = ''
   statusEl.textContent = 'Para Claude'
 }
 
@@ -1258,7 +1270,7 @@ function renderClaudeParamsSummary(params) {
   if (!entries.length) { summaryEl.style.display = 'none'; return }
   summaryEl.style.display = 'block'
   gridEl.innerHTML = entries.map(([k, v]) =>
-    `<div class="claude-param-item">${k.replace(/_/g, ' ')}: <span>${escHtml(v)}</span></div>`
+    `<div class="claude-param-item">${escHtml(k.replace(/_/g, ' '))}: <span>${escHtml(v)}</span></div>`
   ).join('')
 }
 
@@ -1369,8 +1381,16 @@ async function loadInfluencers() {
     localStorage.setItem('zami_influencers', JSON.stringify(list))
     renderInfluencersPanel(list)
   } catch {
-    const cached = localStorage.getItem('zami_influencers')
-    renderInfluencersPanel(cached ? JSON.parse(cached) : [])
+    renderInfluencersPanel(getCachedInfluencers())
+  }
+}
+
+function getCachedInfluencers() {
+  try {
+    return JSON.parse(localStorage.getItem('zami_influencers') || '[]')
+  } catch {
+    localStorage.removeItem('zami_influencers')
+    return []
   }
 }
 
@@ -1415,7 +1435,7 @@ function selectInfluencer(btn) {
   document.getElementById('p4-influencer-label').textContent = `${inf.nombre} · ${inf.nicho} · ${inf.weeks?.length || 0} semanas generadas`
   document.getElementById('btn-generate-plan').disabled = false
   setContentPlanStatus('Influencer cargada. Clic en "Generar Plan Semanal" para comenzar.')
-  renderInfluencersPanel(JSON.parse(localStorage.getItem('zami_influencers') || '[]'))
+  renderInfluencersPanel(getCachedInfluencers())
   document.getElementById('content-plan-status').scrollIntoView({ behavior: 'smooth', block: 'start' })
 }
 
@@ -1446,7 +1466,7 @@ function showNewInfluencerFlow() {
   document.getElementById('p4-body-img').style.display = 'none'
   document.getElementById('p4-influencer-label').textContent = 'Sin influencer seleccionada'
 
-  renderInfluencersPanel(JSON.parse(localStorage.getItem('zami_influencers') || '[]'))
+  renderInfluencersPanel(getCachedInfluencers())
   document.getElementById('create-section').scrollIntoView({ behavior: 'smooth', block: 'start' })
 }
 
@@ -1604,6 +1624,7 @@ async function saveCurrentInfluencer() {
   status.style.color = '#888'
 
   try {
+    generatedPersonaText = getCurrentPersonaText()
     const res = await fetch('/api/influencers', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -1699,8 +1720,18 @@ function renderPersona(text, nombre, nicho) {
 }
 
 function copyPersona() {
+  const text = getCurrentPersonaText()
+  navigator.clipboard.writeText(text).then(() => {
+    const btn = event.target
+    btn.textContent = 'Copiado'
+    setTimeout(() => { btn.textContent = 'Copiar perfil' }, 2000)
+  })
+}
+
+function getCurrentPersonaText() {
   const card  = document.getElementById('persona-output')
   const lines = []
+  if (!card || !card.querySelector('.profile-section')) return generatedPersonaText || ''
   card.querySelectorAll('.profile-section').forEach(sec => {
     lines.push('\n' + sec.querySelector('.section-title').innerText)
     sec.querySelectorAll('.profile-field').forEach(field => {
@@ -1710,11 +1741,7 @@ function copyPersona() {
       else if (val) lines.push(`- ${val}`)
     })
   })
-  navigator.clipboard.writeText(lines.join('\n')).then(() => {
-    const btn = event.target
-    btn.textContent = 'Copiado'
-    setTimeout(() => { btn.textContent = 'Copiar perfil' }, 2000)
-  })
+  return lines.join('\n').trim()
 }
 
 // ── Fase 4 ────────────────────────────────────────────────────────────────────
@@ -1744,6 +1771,7 @@ async function generateContentPlan() {
   setContentPlanStatus('Claude está diseñando la semana de contenido... ~45 segundos.')
 
   try {
+    generatedPersonaText = getCurrentPersonaText()
     const res = await fetch('/api/generate-content-plan', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -1865,7 +1893,7 @@ async function generateDayImages(dayData, onComplete) {
       const slot = document.getElementById(`slot-d${dayData.dayIndex}-v${v.varIndex}`)
       if (slot) slot.innerHTML = `<div class="slot-placeholder" style="color:#f87171">Error: ${escHtml(err.message)}</div>`
     }
-    if (onComplete) onComplete()
+    throw err
   }
 }
 
@@ -1883,12 +1911,25 @@ async function pollDaySlot(runId, dayIndex, varCount, deadline = Date.now() + 72
           const imgUrl = images[i]
           if (slot && imgUrl) {
             const fname = `dia${dayIndex + 1}_var${i + 1}.jpg`
-            slot.innerHTML = `
-              <img src="${escHtml(imgUrl)}" alt="Var ${i + 1}" onclick="window.open('${escHtml(imgUrl)}','_blank')">
-              <button class="btn-download" onclick="downloadImage('${escHtml(imgUrl)}','${escHtml(fname)}')">Descargar</button>`
+            slot.textContent = ''
+            const img = document.createElement('img')
+            img.src = imgUrl
+            img.alt = `Var ${i + 1}`
+            img.addEventListener('click', () => window.open(imgUrl, '_blank'))
+            const btn = document.createElement('button')
+            btn.className = 'btn-download'
+            btn.textContent = 'Descargar'
+            btn.addEventListener('click', () => downloadImage(imgUrl, fname))
+            slot.appendChild(img)
+            slot.appendChild(btn)
           } else if (slot) {
             slot.innerHTML = '<div class="slot-placeholder" style="color:#f87171">Sin imagen</div>'
           }
+        }
+        if (images.length < varCount) {
+          const err = new Error(`ComfyDeploy devolvio ${images.length}/${varCount} imagenes`)
+          err.fatal = true
+          throw err
         }
         return
       }
@@ -1897,14 +1938,20 @@ async function pollDaySlot(runId, dayIndex, varCount, deadline = Date.now() + 72
           const slot = document.getElementById(`slot-d${dayIndex}-v${i}`)
           if (slot) slot.innerHTML = `<div class="slot-placeholder" style="color:#f87171">${escHtml(data.message || 'error')}</div>`
         }
-        return
+        const err = new Error(data.message || 'ComfyDeploy error')
+        err.fatal = true
+        throw err
       }
-    } catch (err) { console.warn('poll day error:', err.message) }
+    } catch (err) {
+      if (err.fatal) throw err
+      console.warn('poll day error:', err.message)
+    }
   }
   for (let i = 0; i < varCount; i++) {
     const slot = document.getElementById(`slot-d${dayIndex}-v${i}`)
     if (slot) slot.innerHTML = '<div class="slot-placeholder" style="color:#f87171">Timeout</div>'
   }
+  throw new Error('Timeout generando imagenes del dia')
 }
 
 async function downloadImage(url, filename) {

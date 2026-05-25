@@ -13,13 +13,25 @@ function loadEnv() {
   if (!fs.existsSync(envPath)) return
   fs.readFileSync(envPath, 'utf8').split(/\r?\n/).forEach(line => {
     const m = line.match(/^\s*([^#=\s]+)\s*=\s*(.*)$/)
-    if (m) process.env[m[1]] = m[2].trim().replace(/^["']|["']$/g, '')
+    if (m) process.env[m[1]] = cleanEnvValue(m[2])
   })
+}
+
+function cleanEnvValue(value) {
+  let v = value.trim()
+  if (!v) return ''
+  if ((v.startsWith('"') && v.endsWith('"')) || (v.startsWith("'") && v.endsWith("'"))) {
+    return v.slice(1, -1)
+  }
+  const hash = v.search(/\s#/)
+  if (hash !== -1) v = v.slice(0, hash).trim()
+  return v.replace(/^["']|["']$/g, '')
 }
 loadEnv()
 
 const API_KEY               = process.env.VITE_COMFYDEPLOY_API_KEY || ''
 const ANTHROPIC_KEY         = process.env.ANTHROPIC_API_KEY || ''
+const ANTHROPIC_MODEL       = process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-6'
 const DEPLOYMENT_ID_AION    = process.env.VITE_COMFYDEPLOY_AION_DEPLOYMENT_ID || 'c6e6b7f0-e574-4aa8-9012-54e8507202e2'
 const DEPLOYMENT_ID_BODY    = process.env.VITE_COMFYDEPLOY_BODY_DEPLOYMENT_ID || 'cabf22a3-a697-485c-a6df-b6c09ee4f2f1'
 const DEPLOYMENT_ID_CONTENT = process.env.VITE_COMFYDEPLOY_CONTENT_DEPLOYMENT_ID || '8d4702cb-c504-4bf2-8284-ee17d6e66633'
@@ -31,18 +43,40 @@ const HOST                  = '127.0.0.1'
 const CD_BASE               = 'api.comfydeploy.com'
 const DATA_DIR              = path.join(__dirname, 'data')
 const INFLUENCERS_FILE      = path.join(DATA_DIR, 'influencers.json')
+const MAX_JSON_BODY_BYTES   = 25 * 1024 * 1024
+const MAX_UPLOAD_BYTES      = 8 * 1024 * 1024
+const ALLOWED_IMAGE_TYPES   = new Set(['image/jpeg', 'image/png', 'image/webp'])
+const IMAGE_EXTENSIONS      = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' }
+let influencerWriteQueue    = Promise.resolve()
 
 // ── Influencers persistence ──────────────────────────────────────────────────
 function loadInfluencers() {
   if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true })
   if (!fs.existsSync(INFLUENCERS_FILE)) fs.writeFileSync(INFLUENCERS_FILE, JSON.stringify({ influencers: [] }))
   try { return JSON.parse(fs.readFileSync(INFLUENCERS_FILE, 'utf8')) }
-  catch { return { influencers: [] } }
+  catch (err) {
+    const backup = path.join(DATA_DIR, `influencers.corrupt.${Date.now()}.json`)
+    try { fs.copyFileSync(INFLUENCERS_FILE, backup) } catch {}
+    throw new Error(`data/influencers.json corrupto; backup creado en ${path.basename(backup)}. ${err.message}`)
+  }
 }
 
 function saveInfluencers(data) {
   if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true })
-  fs.writeFileSync(INFLUENCERS_FILE, JSON.stringify(data, null, 2))
+  const tmp = `${INFLUENCERS_FILE}.${process.pid}.${Date.now()}.tmp`
+  fs.writeFileSync(tmp, JSON.stringify(data, null, 2))
+  fs.renameSync(tmp, INFLUENCERS_FILE)
+}
+
+function updateInfluencers(mutator) {
+  const job = influencerWriteQueue.then(() => {
+    const data = loadInfluencers()
+    const result = mutator(data)
+    saveInfluencers(data)
+    return result
+  })
+  influencerWriteQueue = job.catch(() => {})
+  return job
 }
 
 // ── ComfyDeploy helpers ──────────────────────────────────────────────────────
@@ -258,7 +292,7 @@ Arquetipo (ej. femme fatale, chica de al lado, CEO baddie): ___
 Fantasía principal que encarna para sus fans: ___` })
 
   const payload = JSON.stringify({
-    model: 'claude-sonnet-4-6',
+    model: ANTHROPIC_MODEL,
     max_tokens: 4000,
     messages: [{ role: 'user', content }],
   })
@@ -311,7 +345,7 @@ The prompt MUST include ALL of the following with maximum specificity:
 Output ONLY the prompt text. No explanations, no quotes, no labels.`
 
   const payload = JSON.stringify({
-    model: 'claude-sonnet-4-6',
+    model: ANTHROPIC_MODEL,
     max_tokens: 500,
     messages: [{ role: 'user', content: promptText }],
   })
@@ -401,7 +435,7 @@ FORMATO: ÚNICAMENTE JSON válido. Sin markdown.
 5 días (dayIndex 0–4), 4 variaciones por día (varIndex 0–3).` })
 
   const payload = JSON.stringify({
-    model: 'claude-sonnet-4-6',
+    model: ANTHROPIC_MODEL,
     max_tokens: 8000,
     messages: [{ role: 'user', content }],
   })
@@ -520,7 +554,7 @@ async function generateAionParams(description, referenceImages, photoType) {
   content.push({ type: 'text', text: `${typeHint}Influencer description: ${description}` })
 
   const payload = JSON.stringify({
-    model: 'claude-sonnet-4-6',
+    model: ANTHROPIC_MODEL,
     max_tokens: 1500,
     system: AION_EXPERT_SYSTEM_PROMPT,
     messages: [{ role: 'user', content }],
@@ -594,25 +628,94 @@ function extractImages(outputs) {
 function readBody(req) {
   return new Promise((resolve, reject) => {
     let raw = ''
-    req.on('data', d => raw += d)
-    req.on('end', () => { try { resolve(JSON.parse(raw || '{}')) } catch { resolve({}) } })
+    let total = 0
+    req.on('data', d => {
+      total += d.length
+      if (total > MAX_JSON_BODY_BYTES) {
+        const err = new Error(`Body demasiado grande. Max ${(MAX_JSON_BODY_BYTES / 1024 / 1024).toFixed(0)}MB`)
+        err.statusCode = 413
+        req.destroy(err)
+        return
+      }
+      raw += d
+    })
+    req.on('end', () => {
+      try { resolve(JSON.parse(raw || '{}')) }
+      catch {
+        const err = new Error('JSON invalido')
+        err.statusCode = 400
+        reject(err)
+      }
+    })
     req.on('error', reject)
   })
 }
 
 function json(res, code, data) {
   const body = JSON.stringify(data)
-  res.writeHead(code, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' })
+  res.writeHead(code, { 'Content-Type': 'application/json' })
   res.end(body)
+}
+
+function fail(res, err) {
+  json(res, err.statusCode || 500, { error: err.message })
+}
+
+function decodeBase64Image(data, type) {
+  if (!ALLOWED_IMAGE_TYPES.has(type)) {
+    const err = new Error('Tipo de imagen no permitido. Usa JPEG, PNG o WebP.')
+    err.statusCode = 400
+    throw err
+  }
+  if (typeof data !== 'string' || !/^[A-Za-z0-9+/]+={0,2}$/.test(data) || data.length % 4 !== 0) {
+    const err = new Error('Imagen base64 invalida')
+    err.statusCode = 400
+    throw err
+  }
+  const buffer = Buffer.from(data, 'base64')
+  if (!buffer.length || buffer.length > MAX_UPLOAD_BYTES) {
+    const err = new Error(`Imagen demasiado grande. Max ${(MAX_UPLOAD_BYTES / 1024 / 1024).toFixed(0)}MB.`)
+    err.statusCode = 413
+    throw err
+  }
+  if (!looksLikeImage(buffer, type)) {
+    const err = new Error('El contenido no coincide con el tipo de imagen declarado')
+    err.statusCode = 400
+    throw err
+  }
+  return buffer
+}
+
+function looksLikeImage(buffer, type) {
+  if (type === 'image/jpeg') return buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff
+  if (type === 'image/png')  return buffer.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))
+  if (type === 'image/webp') return buffer.subarray(0, 4).toString('ascii') === 'RIFF' && buffer.subarray(8, 12).toString('ascii') === 'WEBP'
+  return false
+}
+
+function isAllowedOrigin(origin) {
+  return !origin || origin === `http://${HOST}:${PORT}`
 }
 
 const server = http.createServer(async (req, res) => {
   const parsed   = url.parse(req.url, true)
   const pathname = parsed.pathname
+  const origin   = req.headers.origin
 
   if (req.method === 'OPTIONS') {
-    res.writeHead(204, { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': '*', 'Access-Control-Allow-Methods': '*' })
+    if (!isAllowedOrigin(origin)) {
+      res.writeHead(403)
+      res.end('Forbidden')
+      return
+    }
+    res.writeHead(204, { 'Access-Control-Allow-Origin': `http://${HOST}:${PORT}`, 'Access-Control-Allow-Headers': 'Content-Type', 'Access-Control-Allow-Methods': 'GET,POST,OPTIONS' })
     res.end()
+    return
+  }
+
+  if (!isAllowedOrigin(origin)) {
+    res.writeHead(403)
+    res.end('Forbidden')
     return
   }
 
@@ -641,8 +744,9 @@ const server = http.createServer(async (req, res) => {
       const { name, data, type } = body
       if (!name || !data) { json(res, 400, { error: 'name y data requeridos' }); return }
 
-      const buffer   = Buffer.from(data, 'base64')
-      const ext      = (type || 'image/jpeg').split('/')[1] || 'jpg'
+      const imageType = type || 'image/jpeg'
+      const buffer   = decodeBase64Image(data, imageType)
+      const ext      = IMAGE_EXTENSIONS[imageType]
       const filename = `refs/${Date.now()}-${name.replace(/[^a-z0-9]/gi, '_')}.${ext}`
 
       console.log(`\n[UPLOAD-IMAGE] name="${name}" size=${(buffer.length / 1024).toFixed(1)}KB`)
@@ -652,7 +756,7 @@ const server = http.createServer(async (req, res) => {
       json(res, 200, { url: imageUrl })
     } catch (err) {
       console.error('[UPLOAD-IMAGE ERROR]', err.message)
-      json(res, 500, { error: err.message })
+      fail(res, err)
     }
     return
   }
@@ -693,7 +797,7 @@ const server = http.createServer(async (req, res) => {
       json(res, 200, { runIds: [runId] })
     } catch (err) {
       console.error('[GENERATE-FACE ERROR]', err.message)
-      json(res, 500, { error: err.message })
+      fail(res, err)
     }
     return
   }
@@ -708,6 +812,12 @@ const server = http.createServer(async (req, res) => {
 
       if (!description)   { json(res, 400, { error: 'description requerida' }); return }
       if (!ANTHROPIC_KEY) { json(res, 500, { error: 'Agrega ANTHROPIC_API_KEY en tu .env' }); return }
+      if (!Array.isArray(refImages) || refImages.filter(Boolean).length > 4) {
+        json(res, 400, { error: 'reference_images debe tener maximo 4 imagenes' }); return
+      }
+      for (const img of refImages.filter(Boolean)) {
+        decodeBase64Image(img.data, img.type)
+      }
 
       console.log(`\n[CLAUDE-GUIDED] desc="${description.slice(0, 80)}..." refImages=${refImages.filter(Boolean).length} photoType="${photoType}"`)
 
@@ -727,7 +837,7 @@ const server = http.createServer(async (req, res) => {
       json(res, 200, { runId, selected_params: params })
     } catch (err) {
       console.error('[CLAUDE-GUIDED ERROR]', err.message)
-      json(res, 500, { error: err.message })
+      fail(res, err)
     }
     return
   }
@@ -748,7 +858,7 @@ const server = http.createServer(async (req, res) => {
       json(res, 200, { runIds: [runId] })
     } catch (err) {
       console.error('[GENERATE-BODY ERROR]', err.message)
-      json(res, 500, { error: err.message })
+      fail(res, err)
     }
     return
   }
@@ -772,7 +882,7 @@ const server = http.createServer(async (req, res) => {
       json(res, 200, { prompt })
     } catch (err) {
       console.error('[BODY-PROMPT ERROR]', err.message)
-      json(res, 500, { error: err.message })
+      fail(res, err)
     }
     return
   }
@@ -797,7 +907,7 @@ const server = http.createServer(async (req, res) => {
       json(res, 200, { persona })
     } catch (err) {
       console.error('[GENERATE-PERSONA ERROR]', err.message)
-      json(res, 500, { error: err.message })
+      fail(res, err)
     }
     return
   }
@@ -805,7 +915,7 @@ const server = http.createServer(async (req, res) => {
   // GET /api/influencers
   if (req.method === 'GET' && pathname === '/api/influencers') {
     try { json(res, 200, loadInfluencers()) }
-    catch (err) { json(res, 500, { error: err.message }) }
+    catch (err) { fail(res, err) }
     return
   }
 
@@ -823,24 +933,25 @@ const server = http.createServer(async (req, res) => {
       if (!nicho)   { json(res, 400, { error: 'nicho requerido' }); return }
       if (!faceUrl) { json(res, 400, { error: 'face_url requerido' }); return }
 
-      const data = loadInfluencers()
-      const influencer = {
-        id:         crypto.randomUUID(),
-        nombre,
-        nicho,
-        face_url:   faceUrl,
-        body_url:   bodyUrl,
-        persona,
-        created_at: new Date().toISOString(),
-        weeks:      [],
-      }
-      data.influencers.push(influencer)
-      saveInfluencers(data)
+      const influencer = await updateInfluencers(data => {
+        const item = {
+          id:         crypto.randomUUID(),
+          nombre,
+          nicho,
+          face_url:   faceUrl,
+          body_url:   bodyUrl,
+          persona,
+          created_at: new Date().toISOString(),
+          weeks:      [],
+        }
+        data.influencers.push(item)
+        return item
+      })
       console.log(`\n[INFLUENCER SAVED] "${nombre}" id=${influencer.id}`)
       json(res, 200, { influencer })
     } catch (err) {
       console.error('[INFLUENCER SAVE ERROR]', err.message)
-      json(res, 500, { error: err.message })
+      fail(res, err)
     }
     return
   }
@@ -853,24 +964,28 @@ const server = http.createServer(async (req, res) => {
       const body = await readBody(req)
       const { theme, summary, plan } = body
 
-      const data = loadInfluencers()
-      const influencer = data.influencers.find(i => i.id === influencerId)
-      if (!influencer) { json(res, 404, { error: 'influencer no encontrada' }); return }
-
-      const week = {
-        week_id:      crypto.randomUUID(),
-        generated_at: new Date().toISOString(),
-        theme:        theme   || '',
-        summary:      summary || '',
-        plan:         plan    || null,
-      }
-      influencer.weeks.push(week)
-      saveInfluencers(data)
-      console.log(`\n[WEEK SAVED] influencer="${influencer.nombre}" theme="${theme}"`)
-      json(res, 200, { week_id: week.week_id, influencer_id: influencerId })
+      const result = await updateInfluencers(data => {
+        const influencer = data.influencers.find(i => i.id === influencerId)
+        if (!influencer) {
+          const err = new Error('influencer no encontrada')
+          err.statusCode = 404
+          throw err
+        }
+        const week = {
+          week_id:      crypto.randomUUID(),
+          generated_at: new Date().toISOString(),
+          theme:        theme   || '',
+          summary:      summary || '',
+          plan:         plan    || null,
+        }
+        influencer.weeks.push(week)
+        return { week, influencer }
+      })
+      console.log(`\n[WEEK SAVED] influencer="${result.influencer.nombre}" theme="${theme}"`)
+      json(res, 200, { week_id: result.week.week_id, influencer_id: influencerId })
     } catch (err) {
       console.error('[WEEK SAVE ERROR]', err.message)
-      json(res, 500, { error: err.message })
+      fail(res, err)
     }
     return
   }
@@ -898,7 +1013,7 @@ const server = http.createServer(async (req, res) => {
       json(res, 200, { plan })
     } catch (err) {
       console.error('[CONTENT-PLAN ERROR]', err.message)
-      json(res, 500, { error: err.message })
+      fail(res, err)
     }
     return
   }
@@ -913,7 +1028,9 @@ const server = http.createServer(async (req, res) => {
 
       if (!faceUrl)        { json(res, 400, { error: 'face_url requerido' }); return }
       if (!bodyUrl)        { json(res, 400, { error: 'body_url requerido' }); return }
-      if (!prompts.length) { json(res, 400, { error: 'prompts requerido' }); return }
+      if (!Array.isArray(prompts) || prompts.length !== 4 || prompts.some(p => typeof p !== 'string' || !p.trim())) {
+        json(res, 400, { error: 'prompts debe incluir exactamente 4 textos no vacios' }); return
+      }
 
       console.log(`\n[CONTENT-DAY] prompts=${prompts.length}`)
       const runId = await startContentDayRun(faceUrl, bodyUrl, prompts)
@@ -922,7 +1039,7 @@ const server = http.createServer(async (req, res) => {
       json(res, 200, { runIds: [runId] })
     } catch (err) {
       console.error('[CONTENT-DAY ERROR]', err.message)
-      json(res, 500, { error: err.message })
+      fail(res, err)
     }
     return
   }
@@ -949,13 +1066,22 @@ const server = http.createServer(async (req, res) => {
       }
     } catch (err) {
       console.error('[STATUS ERROR]', err.message)
-      json(res, 500, { error: err.message })
+      fail(res, err)
     }
     return
   }
 
   res.writeHead(404)
   res.end('Not found')
+})
+
+server.on('error', err => {
+  if (err.code === 'EADDRINUSE') {
+    console.error(`Puerto ${HOST}:${PORT} ocupado. Cierra el proceso que usa ese puerto y vuelve a ejecutar iniciar.bat.`)
+  } else {
+    console.error('Error del servidor:', err.message)
+  }
+  process.exit(1)
 })
 
 server.listen(PORT, HOST, () => {
@@ -967,6 +1093,7 @@ server.listen(PORT, HOST, () => {
     console.log(`   http://${HOST}:${PORT}`)
     console.log(`   ComfyDeploy: ${API_KEY ? API_KEY.slice(0, 8) + '...' : 'NO CONFIGURADA'}`)
     console.log(`   Anthropic:   ${ANTHROPIC_KEY ? ANTHROPIC_KEY.slice(0, 8) + '...' : 'NO CONFIGURADA'}`)
+    console.log(`   Modelo:      ${ANTHROPIC_MODEL}`)
     console.log(`   AION deploy: ${DEPLOYMENT_ID_AION}`)
     console.log(`   Content:     ${DEPLOYMENT_ID_CONTENT}`)
     console.log(`   Supabase:    ${SUPABASE_URL || 'NO CONFIGURADA'} / bucket: ${SUPABASE_BUCKET}`)
