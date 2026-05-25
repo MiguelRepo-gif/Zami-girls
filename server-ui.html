@@ -758,7 +758,7 @@
           <div class="toggle-header" onclick="toggleSection('params')">
             <button class="toggle-switch" id="switch-params" onclick="event.stopPropagation();toggleSection('params')"></button>
             <span class="toggle-label">Parámetros detallados</span>
-            <span class="toggle-hint" id="hint-params">43 parámetros — todos en auto</span>
+            <span class="toggle-hint" id="hint-params">58 parámetros — todos en auto</span>
           </div>
           <div class="toggle-body" id="body-params">
             <div id="params-grid"></div>
@@ -807,28 +807,28 @@
         <div class="step pending" id="step-1">
           <div class="step-dot">1</div>
           <div class="step-content">
-            <div class="step-title">Generando rostro con AION</div>
+            <div class="step-title">Preparando parámetros</div>
             <div class="step-detail" id="step-1-detail"></div>
           </div>
         </div>
         <div class="step pending" id="step-2">
           <div class="step-dot">2</div>
           <div class="step-content">
-            <div class="step-title">Generando prompt de cuerpo con IA</div>
+            <div class="step-title">Generando rostro y cuerpo</div>
             <div class="step-detail" id="step-2-detail"></div>
           </div>
         </div>
         <div class="step pending" id="step-3">
           <div class="step-dot">3</div>
           <div class="step-content">
-            <div class="step-title">Generando cuerpo con ComfyDeploy</div>
+            <div class="step-title">Resultado listo</div>
             <div class="step-detail" id="step-3-detail"></div>
           </div>
         </div>
         <div class="step pending" id="step-4">
           <div class="step-dot">4</div>
           <div class="step-content">
-            <div class="step-title">Generando perfil completo con Claude</div>
+            <div class="step-title">Creando AI Persona</div>
             <div class="step-detail" id="step-4-detail"></div>
           </div>
         </div>
@@ -959,6 +959,24 @@ const AION_PARAMS = [
   { name:'expression_variant', label:'Expression Variant', group:'Expression', options:['auto','Duchenne smile','social smile','bitter smile','coy smile','broad grin','closed-lip smile','smirk','radiant joy','gentle warmth','laughing','tearful','melancholic gaze','lip tremble','downcast eyes','subtle grief','resigned sadness','nostalgic sadness','holding back tears','cold fury','simmering rage','tight jaw anger','flared nostrils anger','stern disapproval','controlled anger','frustrated scowl','indignant look','wide-eyed shock','mild surprise','open-mouth gasp','raised brows surprise','stunned disbelief','pleasant surprise','startled','wide-eyed fear','frozen terror','anxious worry','nervous tension','subtle unease','panicked expression','deer-in-headlights','mild distaste','strong revulsion','nose wrinkle disgust','lip curl disgust','nauseated look','subtle aversion','one-sided smirk','dismissive look','superior gaze','subtle disdain','eye-roll contempt','sardonic expression','serene neutral','pensive','stoic','blank stare','composed calm','thoughtful gaze','distant look','wistful','determined'] },
 ]
 
+const BODY_PARAMS = [
+  { name:'body_type',            label:'Tipo de cuerpo',    group:'Figura', options:['auto','hourglass','curvy and voluminous','athletic and toned','slim and lean','petite','tall and lean','fit and curvy','natural proportions'] },
+  { name:'height_build',         label:'Altura / Complexión', group:'Figura', options:["auto","petite build (5'1\"-5'3\")","average height (5'4\"-5'6\")","tall build (5'7\"-5'9\")","very tall (5'10\"+)"] },
+  { name:'bust_size',            label:'Busto',             group:'Busto / Cintura', options:['auto','small bust','medium bust','full bust','large bust','very large bust'] },
+  { name:'waist_definition',     label:'Cintura',           group:'Busto / Cintura', options:['auto','undefined waist','slightly defined waist','well-defined waist','very narrow waist','extreme hourglass waist'] },
+  { name:'shoulder_width',       label:'Hombros',           group:'Busto / Cintura', options:['auto','narrow shoulders','medium shoulders','broad shoulders','athletic shoulders'] },
+  { name:'hip_width',            label:'Caderas',           group:'Caderas / Glúteos', options:['auto','narrow hips','medium hips','wide hips','very wide hips'] },
+  { name:'glute_shape',          label:'Glúteos',           group:'Caderas / Glúteos', options:['auto','flat glutes','average glutes','round and full glutes','large and prominent glutes','perky and lifted glutes'] },
+  { name:'waist_hip_ratio',      label:'Ratio Cintura-Cadera', group:'Caderas / Glúteos', options:['auto','extreme hourglass (0.65-0.70)','classic hourglass (0.70-0.75)','soft curves (0.75-0.80)','straight silhouette (0.80+)'] },
+  { name:'thigh_shape',          label:'Muslos',            group:'Piernas', options:['auto','slim thighs','medium thighs','thick and full thighs','muscular thighs','inner thigh gap'] },
+  { name:'leg_length',           label:'Largo de piernas',  group:'Piernas', options:['auto','short legs','average leg length','long legs','very long legs'] },
+  { name:'leg_shape',            label:'Forma de piernas',  group:'Piernas', options:['auto','slim and straight legs','toned athletic legs','curvy and shapely legs','muscular defined legs'] },
+  { name:'calf_shape',           label:'Gemelos',           group:'Piernas', options:['auto','slim calves','average calves','defined calves','muscular calves'] },
+  { name:'body_skin_tone_match', label:'Continuidad piel',  group:'Piel corporal', options:['auto','perfect skin tone continuity from face','slightly lighter body skin','natural sun-kissed variation','uniform flawless skin tone'] },
+  { name:'body_skin_detail',     label:'Detalle de piel',   group:'Piel corporal', options:['auto','flawless smooth skin','natural subtle texture','light tan lines','natural skin grain and pores'] },
+  { name:'body_skin_reflection', label:'Reflexión de piel', group:'Piel corporal', options:['auto','matte natural skin','subtle natural sheen','soft dewy glow','satin skin finish'] },
+]
+
 const IMAGE_SLOTS = [
   { id:'eyes',      label:'Ojos' },
   { id:'eyebrows',  label:'Cejas' },
@@ -1017,16 +1035,12 @@ function buildImageSlots() {
   }
 }
 
-function buildParamsGrid() {
-  const container = document.getElementById('params-grid')
-  container.innerHTML = ''
-
+function buildParamGroupsInto(container, paramList, idPrefix) {
   const groups = {}
-  for (const p of AION_PARAMS) {
+  for (const p of paramList) {
     if (!groups[p.group]) groups[p.group] = []
     groups[p.group].push(p)
   }
-
   for (const [groupName, params] of Object.entries(groups)) {
     const groupDiv = document.createElement('div')
     groupDiv.className = 'param-group'
@@ -1043,16 +1057,32 @@ function buildParamsGrid() {
       const opts = p.options.map(o => `<option value="${escHtml(o)}">${escHtml(o)}</option>`).join('')
       field.innerHTML = `
         <span class="param-label">${p.label}</span>
-        <select class="param-select" id="param-${p.name}" onchange="onParamChange(this)">
+        <select class="param-select" id="${idPrefix}${p.name}" onchange="onParamChange(this)">
           ${opts}
         </select>
       `
       grid.appendChild(field)
     }
-
     groupDiv.appendChild(grid)
     container.appendChild(groupDiv)
   }
+}
+
+function buildParamsGrid() {
+  const container = document.getElementById('params-grid')
+  container.innerHTML = ''
+
+  buildParamGroupsInto(container, AION_PARAMS, 'param-')
+
+  const divider = document.createElement('div')
+  divider.style.cssText = 'border-top:1px solid #2a2a2a;margin:16px 0 8px;'
+  const bodyTitle = document.createElement('div')
+  bodyTitle.style.cssText = 'font-size:0.65rem;font-weight:700;letter-spacing:.12em;color:#C8FF00;text-transform:uppercase;margin-bottom:8px'
+  bodyTitle.textContent = '— BODY PARAMS —'
+  container.appendChild(divider)
+  container.appendChild(bodyTitle)
+
+  buildParamGroupsInto(container, BODY_PARAMS, 'bodyparam-')
 }
 
 // ── Toggle sections ───────────────────────────────────────────────────────────
@@ -1070,12 +1100,17 @@ function onParamChange(sel) {
 }
 
 function updateParamHint() {
-  const count = AION_PARAMS.filter(p => {
+  const faceCount = AION_PARAMS.filter(p => {
     const el = document.getElementById(`param-${p.name}`)
     return el && el.value !== 'auto'
   }).length
+  const bodyCount = BODY_PARAMS.filter(p => {
+    const el = document.getElementById(`bodyparam-${p.name}`)
+    return el && el.value !== 'auto'
+  }).length
+  const total = faceCount + bodyCount
   document.getElementById('hint-params').textContent =
-    count > 0 ? `${count} parámetro(s) seleccionado(s)` : '43 parámetros — todos en auto'
+    total > 0 ? `${total} parámetro(s) seleccionado(s) (${faceCount} rostro, ${bodyCount} cuerpo)` : '58 parámetros — todos en auto'
 }
 
 function updateImageHint() {
@@ -1147,10 +1182,12 @@ function fileToBase64(file) {
 // ── Collect AION inputs ───────────────────────────────────────────────────────
 function getAionInputs() {
   const inputs = {
-    photo_type: document.getElementById('photo-type').value,
-    images:     {},
-    params:     {},
-    prompt:     '',
+    photo_type:       document.getElementById('photo-type').value,
+    images:           {},
+    params:           {},
+    body_params:      {},
+    body_description: '',
+    prompt:           '',
   }
 
   if (sectionState.images) {
@@ -1163,6 +1200,10 @@ function getAionInputs() {
     for (const p of AION_PARAMS) {
       const el = document.getElementById(`param-${p.name}`)
       if (el) inputs.params[p.name] = el.value
+    }
+    for (const p of BODY_PARAMS) {
+      const el = document.getElementById(`bodyparam-${p.name}`)
+      if (el && el.value !== 'auto') inputs.body_params[p.name] = el.value
     }
   }
 
@@ -1262,16 +1303,19 @@ function removeClaudeRefImage(index, event) {
   statusEl.textContent = 'Para Claude'
 }
 
-function renderClaudeParamsSummary(params) {
+function renderClaudeParamsSummary(params, promptBody) {
   const summaryEl = document.getElementById('claude-params-summary')
   const gridEl    = document.getElementById('claude-params-grid')
   if (!summaryEl || !gridEl || !params) return
   const entries = Object.entries(params).filter(([, v]) => v && v !== 'auto')
-  if (!entries.length) { summaryEl.style.display = 'none'; return }
+  if (!entries.length && !promptBody) { summaryEl.style.display = 'none'; return }
   summaryEl.style.display = 'block'
   gridEl.innerHTML = entries.map(([k, v]) =>
     `<div class="claude-param-item">${escHtml(k.replace(/_/g, ' '))}: <span>${escHtml(v)}</span></div>`
   ).join('')
+  if (promptBody) {
+    gridEl.innerHTML += `<div class="claude-param-item" style="grid-column:1/-1;margin-top:8px;border-top:1px solid #2a2a2a;padding-top:8px"><strong style="color:#C8FF00">Body prompt:</strong> <span style="white-space:pre-wrap;font-size:0.75rem;color:#aaa">${escHtml(promptBody)}</span></div>`
+  }
 }
 
 // ── Claude-guided face generation ────────────────────────────────────────────
@@ -1304,42 +1348,40 @@ async function generateWithClaude() {
   document.getElementById('save-influencer-row').style.display = 'none'
 
   try {
-    // ── Paso 1: Claude elige params → AION genera rostro
+    // ── Paso 1: Claude elige params de rostro + genera prompt_body
     const refCount = claudeRefImages.filter(Boolean).length
-    setStep(1, 'active', `Claude analizando descripción${refCount > 0 ? ` + ${refCount} imagen(es)` : ''}...`)
+    setStep(1, 'active', `Claude analizando descripción${refCount > 0 ? ` + ${refCount} imagen(es)` : ''} — seleccionando rostro y cuerpo...`)
 
     const r1 = await apiFetch('/api/claude-guided-face', {
       description,
       photo_type:       photoType,
       reference_images: claudeRefImages.filter(Boolean),
+      nombre,
+      nicho,
     })
 
-    renderClaudeParamsSummary(r1.selected_params)
-    setStep(1, 'active', `Params elegidos — AION generando (run: ${r1.runId.slice(0, 8)}...) — 1–5 min`)
-    generatedFaceUrl = await pollForImage(r1.runId, 1)
+    renderClaudeParamsSummary(r1.selected_params, r1.prompt_body)
+    setStep(1, 'done', `Params elegidos${r1.prompt_body ? ' — prompt de cuerpo listo' : ''}`)
+
+    // ── Paso 2: Generar rostro y cuerpo (un solo run)
+    setStep(2, 'active', `Run: ${r1.runId.slice(0, 8)}... — AION + Gemini cuerpo (~2-5 min)`)
+    const { faceUrl, bodyUrl } = await pollForBoth(r1.runId, 2)
+    generatedFaceUrl = faceUrl
+    generatedBodyUrl = bodyUrl
 
     document.getElementById('result-section').style.display = 'block'
     document.getElementById('result-face-placeholder').style.display = 'none'
     const faceImg = document.getElementById('result-face-img')
     faceImg.src = generatedFaceUrl; faceImg.style.display = 'block'
-    setStep(1, 'done', 'Rostro generado con parámetros elegidos por Claude')
+    if (generatedBodyUrl) {
+      document.getElementById('result-body-placeholder').style.display = 'none'
+      const bodyImg = document.getElementById('result-body-img')
+      bodyImg.src = generatedBodyUrl; bodyImg.style.display = 'block'
+    }
+    setStep(2, 'done', generatedBodyUrl ? 'Rostro y cuerpo generados' : 'Rostro generado')
 
-    // ── Paso 2: Prompt de cuerpo
-    setStep(2, 'active', 'Claude generando prompt de cuerpo...')
-    const r2 = await apiFetch('/api/generate-body-prompt', { nombre, nicho, face_description: description })
-    setStep(2, 'done', r2.prompt)
-
-    // ── Paso 3: Cuerpo con ComfyDeploy
-    setStep(3, 'active', 'Enviando a ComfyDeploy...')
-    const r3 = await apiFetch('/api/generate-body', { prompt: r2.prompt, input_image: generatedFaceUrl })
-    const bodyRunId = r3.runIds[0]
-    setStep(3, 'active', `En cola (run: ${bodyRunId.slice(0, 8)}...) — puede tardar 1–5 min`)
-    generatedBodyUrl = await pollForImage(bodyRunId, 3)
-
-    document.getElementById('result-body-placeholder').style.display = 'none'
-    const bodyImg = document.getElementById('result-body-img')
-    bodyImg.src = generatedBodyUrl; bodyImg.style.display = 'block'
-    setStep(3, 'done', 'Cuerpo generado')
+    // ── Paso 3: Resultado listo
+    setStep(3, 'done', generatedBodyUrl ? 'Rostro + cuerpo listos' : 'Rostro listo')
 
     // ── Paso 4: Perfil AI Persona
     setStep(4, 'active', 'Claude generando perfil completo... (~30 seg)')
@@ -1480,8 +1522,8 @@ async function generateAll() {
   if (!nicho)  { alert('Escribe el nicho de contenido.'); return }
 
   btn.disabled = true
-  generatedFaceUrl   = null
-  generatedBodyUrl   = null
+  generatedFaceUrl     = null
+  generatedBodyUrl     = null
   generatedPersonaText = null
 
   for (let i = 1; i <= 4; i++) setStep(i, 'pending', '')
@@ -1496,47 +1538,46 @@ async function generateAll() {
   document.getElementById('save-influencer-row').style.display = 'none'
 
   const aionInputs = getAionInputs()
+  const hasBodyParams = Object.keys(aionInputs.body_params).length > 0
 
   try {
-    // ── Paso 1: Rostro AION ───────────────────────────────
+    // ── Paso 1: Preparar parámetros ─────────────────────
     const modeHint = [
       sectionState.images && Object.keys(aionInputs.images).length > 0 ? 'imágenes' : null,
-      sectionState.params ? 'params' : null,
+      sectionState.params ? 'params rostro' : null,
+      hasBodyParams ? 'body params' : null,
       sectionState.prompt && aionInputs.prompt ? 'prompt' : null,
     ].filter(Boolean).join(' + ') || 'auto'
-    setStep(1, 'active', `Enviando a AION (modo: ${modeHint})...`)
+    setStep(1, 'active', hasBodyParams
+      ? `Claude generando prompt de cuerpo (${Object.keys(aionInputs.body_params).length} params)...`
+      : `Preparando (modo: ${modeHint})...`)
 
-    const r1     = await apiFetch('/api/generate-face', aionInputs)
-    const faceRunId = r1.runIds[0]
-    setStep(1, 'active', `En cola (run: ${faceRunId.slice(0, 8)}...) — puede tardar 1–5 min`)
-    generatedFaceUrl = await pollForImage(faceRunId, 1)
+    const payload = { ...aionInputs, nombre, nicho }
+    const r1 = await apiFetch('/api/generate-face', payload)
+    const runId = r1.runId
+    setStep(1, 'done', hasBodyParams ? 'Prompt de cuerpo generado — en cola' : 'Parámetros enviados — en cola')
+
+    // ── Paso 2: Generar rostro y cuerpo (un solo run) ───
+    setStep(2, 'active', `Run: ${runId.slice(0, 8)}... — AION + Gemini cuerpo (~2-5 min)`)
+    const { faceUrl, bodyUrl } = await pollForBoth(runId, 2)
+    generatedFaceUrl = faceUrl
+    generatedBodyUrl = bodyUrl
 
     document.getElementById('result-section').style.display = 'block'
     document.getElementById('result-face-placeholder').style.display = 'none'
     const faceImg = document.getElementById('result-face-img')
     faceImg.src = generatedFaceUrl; faceImg.style.display = 'block'
-    setStep(1, 'done', 'Rostro generado')
+    if (generatedBodyUrl) {
+      document.getElementById('result-body-placeholder').style.display = 'none'
+      const bodyImg = document.getElementById('result-body-img')
+      bodyImg.src = generatedBodyUrl; bodyImg.style.display = 'block'
+    }
+    setStep(2, 'done', generatedBodyUrl ? 'Rostro y cuerpo generados' : 'Rostro generado')
 
-    // ── Paso 2: Prompt de cuerpo ──────────────────────────
-    setStep(2, 'active', 'Claude generando prompt de cuerpo...')
-    const faceDescription = buildFaceDescription(aionInputs)
-    const r2 = await apiFetch('/api/generate-body-prompt', { nombre, nicho, face_description: faceDescription })
-    const bodyPrompt = r2.prompt
-    setStep(2, 'done', bodyPrompt)
+    // ── Paso 3: Resultado listo ─────────────────────────
+    setStep(3, 'done', generatedBodyUrl ? 'Rostro + cuerpo listos' : 'Rostro listo')
 
-    // ── Paso 3: Cuerpo con ComfyDeploy ───────────────────
-    setStep(3, 'active', 'Enviando a ComfyDeploy...')
-    const r3 = await apiFetch('/api/generate-body', { prompt: bodyPrompt, input_image: generatedFaceUrl })
-    const bodyRunId = r3.runIds[0]
-    setStep(3, 'active', `En cola (run: ${bodyRunId.slice(0, 8)}...) — puede tardar 1–5 min`)
-    generatedBodyUrl = await pollForImage(bodyRunId, 3)
-
-    document.getElementById('result-body-placeholder').style.display = 'none'
-    const bodyImg = document.getElementById('result-body-img')
-    bodyImg.src = generatedBodyUrl; bodyImg.style.display = 'block'
-    setStep(3, 'done', 'Cuerpo generado')
-
-    // ── Paso 4: Perfil AI Persona ─────────────────────────
+    // ── Paso 4: Perfil AI Persona ────────────────────────
     setStep(4, 'active', 'Claude generando perfil completo... (~30 seg)')
     const r4 = await apiFetch('/api/generate-persona', { nombre, nicho, face_url: generatedFaceUrl, body_url: generatedBodyUrl })
     generatedPersonaText = r4.persona
@@ -1584,7 +1625,7 @@ async function apiFetch(path, body) {
   return data
 }
 
-async function pollForImage(runId, stepNum) {
+async function pollForBoth(runId, stepNum) {
   const deadline = Date.now() + 600_000
   let elapsed = 0
   while (Date.now() < deadline) {
@@ -1594,12 +1635,13 @@ async function pollForImage(runId, stepNum) {
       const res  = await fetch(`/api/status/${runId}`)
       const data = await res.json()
       if (data.status === 'success') {
-        const images = data.images || []
-        if (!images[0]) throw new Error('ComfyDeploy no devolvio imagen')
-        return images[0]
+        const faceUrl = data.face_url || (data.images && data.images[0]) || null
+        const bodyUrl = data.body_url || null
+        if (!faceUrl) throw new Error('ComfyDeploy no devolvio imagen de rostro')
+        return { faceUrl, bodyUrl }
       }
       if (data.status === 'error') throw new Error(data.message || 'ComfyDeploy error')
-      setStep(stepNum, 'active', `Procesando... ${Math.round(elapsed / 1000)}s`)
+      setStep(stepNum, 'active', `Generando rostro y cuerpo... ${Math.round(elapsed / 1000)}s`)
     } catch (err) {
       if (err.message.includes('ComfyDeploy') || err.message.includes('no devolvio')) throw err
       console.warn('poll error:', err.message)

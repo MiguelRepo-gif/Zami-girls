@@ -154,7 +154,7 @@ function uploadToSupabase(buffer, filename, contentType) {
   })
 }
 
-// ── Body generation ──────────────────────────────────────────────────────────
+// ── Body generation (legacy — deployment cabf22a3) ───────────────────────────
 async function startBodyRun(prompt, inputImage) {
   const res = await cdRequest('POST', `/api/run/deployment/queue`, {
     deployment_id: DEPLOYMENT_ID_BODY,
@@ -162,6 +162,22 @@ async function startBodyRun(prompt, inputImage) {
       input_image:     String(inputImage),
       filename_prefix: 'ComfyUI',
       prompt:          String(prompt),
+    },
+  })
+  if (res.status !== 200 && res.status !== 201) {
+    throw new Error(`ComfyDeploy ${res.status}: ${JSON.stringify(res.body)}`)
+  }
+  return res.body.run_id
+}
+
+// ── Body generation v2 — Nano Banana Pro (Gemini) via image_rostro (deployment c6e6b7f0) ──
+async function startBodyRunV2(faceUrl, promptBody) {
+  const res = await cdRequest('POST', `/api/run/deployment/queue`, {
+    deployment_id: DEPLOYMENT_ID_AION,
+    inputs: {
+      'image_rostro': String(faceUrl),
+      'prompt_body':  String(promptBody),
+      'save_image':   'ComfyUI',
     },
   })
   if (res.status !== 200 && res.status !== 201) {
@@ -471,6 +487,93 @@ FORMATO: ÚNICAMENTE JSON válido. Sin markdown.
   })
 }
 
+// ── AION Body Params ─────────────────────────────────────────────────────────
+const BODY_PARAM_OPTIONS = {
+  body_type:            ['hourglass','curvy and voluminous','athletic and toned','slim and lean','petite','tall and lean','fit and curvy','natural proportions'],
+  height_build:         ["petite build (5'1\"-5'3\")","average height (5'4\"-5'6\")","tall build (5'7\"-5'9\")","very tall (5'10\"+)"],
+  bust_size:            ['small bust','medium bust','full bust','large bust','very large bust'],
+  waist_definition:     ['undefined waist','slightly defined waist','well-defined waist','very narrow waist','extreme hourglass waist'],
+  shoulder_width:       ['narrow shoulders','medium shoulders','broad shoulders','athletic shoulders'],
+  hip_width:            ['narrow hips','medium hips','wide hips','very wide hips'],
+  glute_shape:          ['flat glutes','average glutes','round and full glutes','large and prominent glutes','perky and lifted glutes'],
+  waist_hip_ratio:      ['extreme hourglass (0.65-0.70)','classic hourglass (0.70-0.75)','soft curves (0.75-0.80)','straight silhouette (0.80+)'],
+  thigh_shape:          ['slim thighs','medium thighs','thick and full thighs','muscular thighs','inner thigh gap'],
+  leg_length:           ['short legs','average leg length','long legs','very long legs'],
+  leg_shape:            ['slim and straight legs','toned athletic legs','curvy and shapely legs','muscular defined legs'],
+  calf_shape:           ['slim calves','average calves','defined calves','muscular calves'],
+  body_skin_tone_match: ['perfect skin tone continuity from face','slightly lighter body skin','natural sun-kissed variation','uniform flawless skin tone'],
+  body_skin_detail:     ['flawless smooth skin','natural subtle texture','light tan lines','natural skin grain and pores'],
+  body_skin_reflection: ['matte natural skin','subtle natural sheen','soft dewy glow','satin skin finish'],
+}
+
+const BODY_EXPERT_SYSTEM_PROMPT = `You are a precision body prompt engineer for Gemini image generation. You receive 15 body parameters and output a single English prompt that controls ONLY the body in the generated image.
+
+MANDATORY VISUAL RULES — non-negotiable:
+- Pure white background (#FFFFFF), high-key shadowless studio lighting
+- Full body standing shot, head-to-toe, centered, straight-on or slight 3/4 angle
+- Outfit: white seamless bodysuit OR nude-tone form-fitting one-piece swimwear — zero accessories, zero patterns, zero textures. The outfit exists only to reveal body proportions.
+
+PROMPT CONSTRUCTION ORDER:
+1. Height and overall build (1 short sentence using height_build + body_type params)
+2. Upper body: shoulder width, bust size, waist definition (use exact params)
+3. Lower body: waist_hip_ratio, hip width, glute shape, thigh shape, leg length, leg shape, calf shape
+4. Skin: body_skin_tone_match, body_skin_detail, body_skin_reflection
+
+STRICT RULES:
+- Translate each parameter into a concrete anatomical descriptor
+- NO face description, NO hair, NO background beyond white studio
+- NO scene, NO location, NO props
+- All influencers are beautiful, sexy, and aspirational — no exceptions
+- 120–150 words MAX
+- Output ONLY the prompt text. No markdown, no labels, no explanations.`
+
+async function generateBodyPromptFromParams(nombre, nicho, bodyParams, bodyDescription) {
+  const paramLines = Object.entries(BODY_PARAM_OPTIONS)
+    .map(([k, opts]) => {
+      const val = bodyParams && bodyParams[k] ? bodyParams[k] : opts[0]
+      return `${k}: "${val}"`
+    })
+    .join('\n')
+
+  const descLine = bodyDescription ? `\nAdditional body context from user: "${bodyDescription}"` : ''
+  const userMsg = `Influencer name: ${nombre}\nNiche: ${nicho}${descLine}\n\nSelected body parameters:\n${paramLines}`
+
+  const payload = JSON.stringify({
+    model:      ANTHROPIC_MODEL,
+    max_tokens: 300,
+    system:     BODY_EXPERT_SYSTEM_PROMPT,
+    messages:   [{ role: 'user', content: userMsg }],
+  })
+
+  return new Promise((resolve, reject) => {
+    const opts = {
+      hostname: 'api.anthropic.com',
+      path:     '/v1/messages',
+      method:   'POST',
+      headers: {
+        'x-api-key':         ANTHROPIC_KEY,
+        'anthropic-version': '2023-06-01',
+        'content-type':      'application/json',
+        'content-length':    Buffer.byteLength(payload),
+      },
+    }
+    const req = https.request(opts, res => {
+      let raw = ''
+      res.on('data', d => raw += d)
+      res.on('end', () => {
+        try {
+          const data = JSON.parse(raw)
+          if (res.statusCode !== 200) throw new Error(`Anthropic ${res.statusCode}: ${JSON.stringify(data)}`)
+          resolve(data.content[0].text.trim())
+        } catch (e) { reject(e) }
+      })
+    })
+    req.on('error', reject)
+    req.write(payload)
+    req.end()
+  })
+}
+
 // ── AION Expert Params — Claude selects from natural language ────────────────
 const AION_EXPERT_SYSTEM_PROMPT = `You are AION Casting Director, a world-class expert in creating hyperrealistic virtual influencer faces for AI image generation workflows.
 
@@ -533,11 +636,19 @@ expression_variant: ["auto","Duchenne smile","social smile","bitter smile","coy 
 
 OUTPUT RULES:
 - Return ONLY a valid JSON object — no markdown, no code blocks, no explanation, no extra text
-- Include ALL 43 parameters in your response
-- Use ONLY the exact string values listed above
-- Example: {"sex":"female","ethnicity":"Latin American","eye_shape":"almond-shaped",...}`
+- Include ALL 43 face parameters PLUS the "prompt_body" field (44 fields total)
+- Use ONLY the exact string values listed above for face params
+- "prompt_body": a 150–250 word English prompt for GPT Image 2 describing the full body. Follow this structure:
+  1. Subject: photorealistic full-body portrait of the woman
+  2. Body proportions inferred from her ethnicity/build + niche (fitness=athletic, gamer=soft curvy, fashion=hourglass, etc.)
+  3. Outfit: sexy, form-fitting, niche-appropriate (SFW) — NEVER plain or neutral
+  4. Pose: confident and sexy
+  5. Setting + lighting: cinematic, flattering
+  6. Technical: "full body shot, fashion photography, Sony A7R V, 35mm, 8K, photorealistic, ultra-detailed"
+  All influencers are beautiful and sexy. Skin tone of body must match face skin_tone param.
+- Example: {"sex":"female","ethnicity":"Latin American","eye_shape":"almond-shaped",...,"prompt_body":"A photorealistic full-body portrait..."}`
 
-async function generateAionParams(description, referenceImages, photoType) {
+async function generateAionParams(description, referenceImages, photoType, nombre, nicho) {
   const content = []
 
   if (referenceImages && referenceImages.length > 0) {
@@ -551,7 +662,8 @@ async function generateAionParams(description, referenceImages, photoType) {
   const typeHint = photoType && photoType !== '-- Not selected / System inferred --'
     ? `Photo type: "${photoType}"\n\n`
     : ''
-  content.push({ type: 'text', text: `${typeHint}Influencer description: ${description}` })
+  const nichoHint = nicho ? `Content niche: ${nicho}\nInfluencer name: ${nombre || 'unknown'}\n\n` : ''
+  content.push({ type: 'text', text: `${typeHint}${nichoHint}Influencer description: ${description}` })
 
   const payload = JSON.stringify({
     model: ANTHROPIC_MODEL,
@@ -782,19 +894,33 @@ const server = http.createServer(async (req, res) => {
       }
 
       if (body.params) {
+        const bodyParamKeys = new Set(Object.keys(BODY_PARAM_OPTIONS))
         for (const [key, val] of Object.entries(body.params)) {
-          inputs[key] = val
+          if (!bodyParamKeys.has(key)) inputs[key] = val
         }
       }
 
+      const nombre          = (body.nombre || '').trim()
+      const nicho           = (body.nicho  || '').trim()
+      const hasBodyParams   = body.body_params && Object.keys(body.body_params).length > 0
+      const hasBodyDesc     = body.body_description && body.body_description.trim()
+
+      let promptBody = null
+      if ((hasBodyParams || hasBodyDesc) && ANTHROPIC_KEY) {
+        console.log(`\n[GENERATE-FACE] Generating prompt_body via Claude...`)
+        promptBody = await generateBodyPromptFromParams(nombre || 'influencer', nicho || 'lifestyle', body.body_params || {}, body.body_description || '')
+        console.log(`  prompt_body (${promptBody.length} chars): ${promptBody.slice(0, 100)}...`)
+      }
+      if (promptBody) inputs['prompt_body'] = promptBody
+
       const imgCount   = Object.keys(body.images  || {}).filter(k => (body.images  || {})[k]).length
       const paramCount = Object.keys(body.params  || {}).filter(k => { const v = (body.params || {})[k]; return v && v !== 'auto' && v !== '-- Not selected / System inferred --' }).length
-      console.log(`\n[GENERATE-FACE] photo_type="${inputs['photo_type']}" images=${imgCount} custom_params=${paramCount} prompt=${!!inputs['prompt']}`)
+      console.log(`\n[GENERATE-FACE] photo_type="${inputs['photo_type']}" images=${imgCount} custom_params=${paramCount} prompt=${!!inputs['prompt']} prompt_body=${!!promptBody}`)
 
       const runId = await startAionRun(inputs)
       console.log(`  run: ${runId}`)
 
-      json(res, 200, { runIds: [runId] })
+      json(res, 200, { runId, prompt_body: promptBody || null })
     } catch (err) {
       console.error('[GENERATE-FACE ERROR]', err.message)
       fail(res, err)
@@ -809,6 +935,8 @@ const server = http.createServer(async (req, res) => {
       const description = (body.description || '').trim()
       const photoType   = (body.photo_type  || '-- Not selected / System inferred --').trim()
       const refImages   = body.reference_images || []
+      const nombre      = (body.nombre || '').trim()
+      const nicho       = (body.nicho  || '').trim()
 
       if (!description)   { json(res, 400, { error: 'description requerida' }); return }
       if (!ANTHROPIC_KEY) { json(res, 500, { error: 'Agrega ANTHROPIC_API_KEY en tu .env' }); return }
@@ -819,22 +947,25 @@ const server = http.createServer(async (req, res) => {
         decodeBase64Image(img.data, img.type)
       }
 
-      console.log(`\n[CLAUDE-GUIDED] desc="${description.slice(0, 80)}..." refImages=${refImages.filter(Boolean).length} photoType="${photoType}"`)
+      console.log(`\n[CLAUDE-GUIDED] desc="${description.slice(0, 80)}..." refImages=${refImages.filter(Boolean).length} photoType="${photoType}" nicho="${nicho}"`)
 
-      const params = await generateAionParams(description, refImages, photoType)
-      console.log(`  Claude seleccionó ${Object.keys(params).length} params`)
-      console.log('  Selected params:', JSON.stringify(params, null, 2))
+      const allParams = await generateAionParams(description, refImages, photoType, nombre, nicho)
+      const { prompt_body: promptBody, ...faceParams } = allParams
+      console.log(`  Claude seleccionó ${Object.keys(faceParams).length} face params, prompt_body=${promptBody ? promptBody.length + ' chars' : 'none'}`)
+      console.log('  Selected face params:', JSON.stringify(faceParams, null, 2))
+      if (promptBody) console.log('  prompt_body:', promptBody.slice(0, 120) + '...')
 
       const inputs = {
         'photo_type':   photoType,
         'imagen final': 'Nano Banana Pro',
-        ...params,
+        ...faceParams,
       }
+      if (promptBody) inputs['prompt_body'] = promptBody
 
       const runId = await startAionRun(inputs)
       console.log(`  run: ${runId}`)
 
-      json(res, 200, { runId, selected_params: params })
+      json(res, 200, { runId, selected_params: faceParams, prompt_body: promptBody || null })
     } catch (err) {
       console.error('[CLAUDE-GUIDED ERROR]', err.message)
       fail(res, err)
@@ -842,16 +973,30 @@ const server = http.createServer(async (req, res) => {
     return
   }
 
-  // POST /api/generate-body
+  // POST /api/generate-body — v2: { face_url, prompt_body } → GPT Image 2 via image_rostro
   if (req.method === 'POST' && pathname === '/api/generate-body') {
     try {
       const body       = await readBody(req)
+      const faceUrl    = (body.face_url    || '').trim()
+      const promptBody = (body.prompt_body || '').trim()
+
+      // v2 path: face_url + prompt_body → GPT Image 2 (same deployment c6e6b7f0)
+      if (faceUrl) {
+        if (!promptBody) { json(res, 400, { error: 'prompt_body requerido con face_url' }); return }
+        console.log(`\n[GENERATE-BODY-V2] face_url="${faceUrl.slice(0, 60)}..." prompt_body="${promptBody.slice(0, 60)}..."`)
+        const runId = await startBodyRunV2(faceUrl, promptBody)
+        console.log(`  run: ${runId}`)
+        json(res, 200, { runId })
+        return
+      }
+
+      // legacy path: { prompt, input_image } → deployment cabf22a3
       const prompt     = (body.prompt || '').trim()
       const inputImage = (body.input_image || '').trim()
-      if (!prompt)     { json(res, 400, { error: 'prompt requerido' }); return }
+      if (!prompt)     { json(res, 400, { error: 'face_url o prompt requerido' }); return }
       if (!inputImage) { json(res, 400, { error: 'input_image requerido' }); return }
 
-      console.log(`\n[GENERATE-BODY] prompt="${prompt.slice(0, 60)}..."`)
+      console.log(`\n[GENERATE-BODY-LEGACY] prompt="${prompt.slice(0, 60)}..."`)
       const runId = await startBodyRun(prompt, inputImage)
       console.log(`  run: ${runId}`)
 
@@ -1056,8 +1201,14 @@ const server = http.createServer(async (req, res) => {
         console.log(`\n[STATUS] ${runId} -> success`)
         console.log('OUTPUTS:', JSON.stringify(data.outputs, null, 2))
         const images = extractImages(data.outputs)
-        console.log(`  images extracted: ${images.length}`)
-        json(res, 200, { status: 'success', images })
+        console.log(`  images extracted: ${images.length}`, images.map(u => u.split('/').pop()))
+        // Node 14 (AION) prefix "Nano Banana Pro" → URL-encoded as Nano%20Banana, NOT ComfyUI
+        // Node 651 (Gemini body) prefix "ComfyUI" → no special chars, safe to match with includes
+        const body_url = images.find(u => u.includes('ComfyUI')) || null
+        const face_url = images.find(u => !u.includes('ComfyUI')) || images[0] || null
+        console.log(`  face_url: ${face_url ? face_url.split('/').pop() : 'none'}`)
+        console.log(`  body_url: ${body_url ? body_url.split('/').pop() : 'none'}`)
+        json(res, 200, { status: 'success', images, face_url, body_url })
       } else if (['failed', 'cancelled', 'timeout'].includes(st)) {
         console.log(`[STATUS] ${runId} -> ${st}`)
         json(res, 200, { status: 'error', message: st })
