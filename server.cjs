@@ -624,6 +624,16 @@ const server = http.createServer(async (req, res) => {
     return
   }
 
+  // Serve hero photo
+  if (req.method === 'GET' && pathname === '/hero-photo.png') {
+    try {
+      const img = fs.readFileSync(path.join(__dirname, 'Foto inicio', 'Nano Banana Pro_00001_.png'))
+      res.writeHead(200, { 'Content-Type': 'image/png', 'Cache-Control': 'public, max-age=86400' })
+      res.end(img)
+    } catch { res.writeHead(404); res.end('Not found') }
+    return
+  }
+
   // POST /api/upload-image — upload reference image to Supabase Storage
   if (req.method === 'POST' && pathname === '/api/upload-image') {
     try {

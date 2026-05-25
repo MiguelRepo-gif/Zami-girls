@@ -6,6 +6,31 @@
 <title>Zammy Girls — AI Studio</title>
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&display=swap" rel="stylesheet">
 <style>
+  :root {
+    --c-accent:   #FF0080;
+    --c-accent-dim: rgba(255,0,128,0.12);
+    --c-accent-mid: rgba(255,0,128,0.28);
+    --c-accent-glow: rgba(255,0,128,0.18);
+    --c-bg:       #0A0A0A;
+    --c-surface:  #161616;
+    --c-surface2: #111111;
+    --c-border:   #2a2a2a;
+    --c-border2:  #1e1e1e;
+    --c-text:     #e8e8e8;
+    --c-muted:    #888888;
+    --c-faint:    #444444;
+    --c-success:  #4ade80;
+    --c-error:    #f87171;
+    --r-card:     14px;
+    --r-input:    10px;
+    --r-btn:      10px;
+    --shadow-card: 0 2px 8px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.03);
+    --shadow-card-hover: 0 4px 20px rgba(0,0,0,0.7), 0 0 0 1px rgba(255,0,128,0.08);
+    --shadow-glow: 0 0 32px rgba(255,0,128,0.22);
+    --transition-fast: 0.15s ease;
+    --transition-spring: 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0 }
   body {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
@@ -67,11 +92,11 @@
   }
   .subtitle { font-size: 0.82rem; color: #555; margin-bottom: 28px; }
 
-  /* ── Labels → Bebas Neue ──────────────────────────────── */
+  /* ── Labels — system font, muted (Bebas Neue is for headings/buttons only) ── */
   label {
-    font-family: 'Bebas Neue', 'Arial Black', Impact, sans-serif;
-    font-size: 0.82rem; font-weight: 400; letter-spacing: 0.1em;
-    color: #FF0080; margin-bottom: 6px; text-transform: uppercase;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    font-size: 0.73rem; font-weight: 700; letter-spacing: 0.07em;
+    color: #777; margin-bottom: 6px; text-transform: uppercase;
   }
 
   /* ── Mode Tabs redesign ───────────────────────────────── */
@@ -152,7 +177,7 @@
   .toggle-hint { font-size: 0.72rem; color: #555 }
   .toggle-switch {
     width: 44px; height: 24px; border-radius: 12px; background: #2a2a2a;
-    position: relative; transition: background .2s; flex-shrink: 0; cursor: pointer;
+    position: relative; transition: background .2s; flex: none; cursor: pointer;
     border: none; padding: 0;
   }
   .toggle-switch::after {
@@ -162,8 +187,8 @@
   }
   .toggle-switch.on { background: rgba(255,0,128,0.2); border: 1px solid rgba(255,0,128,0.4) }
   .toggle-switch.on::after { left: 23px; background: #FF0080 }
-  .toggle-body { display: none; padding: 16px; border-top: 1px solid #2a2a2a; background: #0d0d0d }
-  .toggle-body.open { display: block }
+  .toggle-body { background: #0d0d0d }
+  .toggle-body.open { border-top: 1px solid #2a2a2a; }
 
   /* ── Image Upload Slots ─────────────────────────────── */
   .img-slots { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px }
@@ -334,86 +359,218 @@
   .claude-param-item { font-size: 0.72rem; color: #666 }
   .claude-param-item span { color: #bbb }
 
-  /* ── Heuristic UX/UI Improvements ────────────────────── */
+  /* ══════════════════════════════════════════════════════
+     2026 DESIGN UPGRADES
+     ══════════════════════════════════════════════════════ */
 
-  /* Labels → legibles, no fuchsia agresivo en formularios */
-  label { color: #aaa; }
-
-  /* Toggle switch → borde visible cuando está OFF */
-  .toggle-switch { border: 1px solid #444; }
-  .toggle-switch.on { border-color: #FF0080; }
-  .toggle-switch::after { background: #666; }
-  .toggle-switch.on::after { left: 23px; background: #FF0080; }
-
-  /* Inputs → borde más visible + glow al focus */
-  input[type=text], select, textarea { border-color: #333; }
-  input[type=text]:focus, select:focus, textarea:focus {
-    border-color: #FF0080;
-    box-shadow: 0 0 0 3px rgba(255,0,128,0.08);
+  /* ── Workspace: subtle brand gradient so it doesn't feel flat ── */
+  #workspace {
+    background: radial-gradient(ellipse 80% 40% at 60% -10%, rgba(255,0,128,0.05) 0%, transparent 70%), #0A0A0A;
   }
 
-  /* Botones → feedback de click */
+  /* ── Sidebar logo: gradient strip ── */
+  .sidebar-logo {
+    background: linear-gradient(135deg, #111 0%, #0d0d0d 100%);
+    border-bottom: 1px solid #1e1e1e;
+  }
+
+  /* ── Card depth: all major surfaces get layered shadows ── */
+  .controls {
+    box-shadow: var(--shadow-card);
+    transition: box-shadow var(--transition-fast);
+  }
+  .controls:hover { box-shadow: var(--shadow-card-hover); }
+
+  .profile-card {
+    box-shadow: var(--shadow-card);
+  }
+
+  .day-card {
+    box-shadow: var(--shadow-card);
+    transition: box-shadow var(--transition-fast), transform var(--transition-fast);
+  }
+  .day-card:hover { box-shadow: var(--shadow-card-hover); transform: translateY(-2px); }
+
+  .influencer-card {
+    box-shadow: 0 2px 6px rgba(0,0,0,0.45);
+    transition: box-shadow var(--transition-spring), transform var(--transition-spring), border-color var(--transition-fast);
+  }
+  .influencer-card:hover {
+    box-shadow: 0 6px 24px rgba(0,0,0,0.65), 0 0 0 1px rgba(255,0,128,0.2);
+    transform: translateY(-3px) scale(1.01);
+  }
+  .influencer-card.active {
+    border-color: var(--c-success); border-width: 2px;
+    box-shadow: 0 0 0 3px rgba(74,222,128,0.1), 0 4px 16px rgba(0,0,0,0.5);
+  }
+
+  .steps {
+    box-shadow: var(--shadow-card);
+  }
+
+  .result-img-wrap {
+    box-shadow: var(--shadow-card);
+    transition: box-shadow var(--transition-fast);
+  }
+  .result-img-wrap:hover { box-shadow: var(--shadow-card-hover); }
+
+  /* ── Step dot pulse uses ring instead of opacity blink ── */
+  @keyframes pulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(255,0,128,0.55); }
+    60%       { box-shadow: 0 0 0 8px rgba(255,0,128,0); }
+  }
+
+  /* ── Step progress: connecting line ── */
+  .steps { position: relative; }
+  .step { position: relative; }
+
+  /* ── Toggle: smooth max-height animation (no display:none jump) ── */
+  .toggle-body {
+    display: block !important;
+    max-height: 0; overflow: hidden; visibility: hidden;
+    transition: max-height 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+                opacity 0.25s ease,
+                visibility 0s linear 0.35s;
+    opacity: 0; padding: 0 16px;
+  }
+  .toggle-body.open {
+    max-height: 2000px; visibility: visible; opacity: 1;
+    padding: 16px;
+    transition: max-height 0.4s cubic-bezier(0, 0, 0.2, 1),
+                opacity 0.25s ease 0.05s,
+                visibility 0s linear 0s;
+  }
+
+  /* Toggle header: left accent when ON */
+  .toggle-header { border-left: 3px solid transparent; transition: border-color 0.2s ease, background 0.15s; }
+  .toggle-section:has(#switch-images.on) .toggle-header,
+  .toggle-section:has(#switch-params.on) .toggle-header,
+  .toggle-section:has(#switch-prompt.on) .toggle-header { border-left-color: var(--c-accent); }
+
+  /* ── Toggle switch ── */
+  .toggle-switch { border: 1px solid #444; }
+  .toggle-switch.on { border-color: var(--c-accent); }
+  .toggle-switch::after { background: #666; }
+  .toggle-switch.on::after { left: 23px; background: var(--c-accent); }
+
+  /* ── Inputs: 2px border, visible at rest ── */
+  input[type=text], select, textarea {
+    border: 2px solid #2e2e2e;
+    transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+  }
+  input[type=text]:hover, select:hover, textarea:hover { border-color: #3a3a3a; }
+  input[type=text]:focus, select:focus, textarea:focus {
+    border-color: var(--c-accent);
+    box-shadow: 0 0 0 3px rgba(255,0,128,0.08);
+    outline: none;
+  }
+
+  /* ── Generate button: spring scale on hover ── */
+  #btn-main {
+    transition: background var(--transition-fast), transform var(--transition-spring), box-shadow var(--transition-fast);
+  }
+  #btn-main:hover:not(:disabled) {
+    transform: translateY(-2px) scale(1.02);
+    box-shadow: 0 6px 32px rgba(255,0,128,0.35);
+  }
+  #btn-main:active:not(:disabled) { transform: scale(0.97); }
+
+  /* ── All buttons: press feedback ── */
   button:active:not(:disabled) { transform: scale(0.97); }
 
-  /* Status bar → más prominente */
+  /* ── btn-nueva: spring hover ── */
+  .btn-nueva {
+    transition: background var(--transition-fast), letter-spacing var(--transition-spring);
+  }
+  .btn-nueva:hover:not(:disabled) { letter-spacing: 0.14em; }
+
+  /* ── Status bar: styled panels ── */
   .status-bar {
     background: #111; border: 1px solid #222;
     border-radius: 8px; padding: 10px 14px;
+    transition: background 0.2s, border-color 0.2s;
   }
   .status-bar.success { background: rgba(74,222,128,0.07); border-color: rgba(74,222,128,0.3); }
   .status-bar.error   { background: rgba(248,113,113,0.07); border-color: rgba(248,113,113,0.3); }
 
-  /* Step dot → pulse de sombra (más claro como indicador de carga) */
-  @keyframes pulse {
-    0%, 100% { box-shadow: 0 0 0 0 rgba(255,0,128,0.6); }
-    50%       { box-shadow: 0 0 0 7px rgba(255,0,128,0.12); }
-  }
+  /* ── Result images ── */
+  .result-img-wrap img { transition: filter var(--transition-fast); cursor: zoom-in; }
+  .result-img-wrap img:hover { filter: brightness(1.09); }
+  .result-img-label::after { content: ' · click para ampliar'; font-size: 0.6rem; color: #3a3a3a; }
 
-  /* Result images → hover hint */
-  .result-img-wrap img:hover { filter: brightness(1.08); box-shadow: 0 0 20px rgba(255,0,128,0.15); }
-  .result-img-label::after { content: ' — click para ampliar'; font-size: 0.62rem; color: #444; margin-left: 4px; }
-
-  /* Image upload slots → affordance */
-  .img-slot { background: #111; }
-  .img-slot:hover { background: rgba(255,0,128,0.04); border-color: rgba(255,0,128,0.5); }
+  /* ── Image upload slots ── */
+  .img-slot { background: #111; transition: background var(--transition-fast), border-color var(--transition-fast), transform var(--transition-spring); }
+  .img-slot:hover { background: rgba(255,0,128,0.04); border-color: rgba(255,0,128,0.5); transform: scale(1.03); }
   .img-slot-icon { color: #444; font-size: 1.8rem; }
-
-  /* Upload spinner overlay */
   .img-slot.uploading::after {
     content: ''; position: absolute; top: 50%; left: 50%;
     width: 22px; height: 22px;
-    border: 2px solid rgba(255,0,128,0.2); border-top-color: #FF0080;
+    border: 2px solid rgba(255,0,128,0.2); border-top-color: var(--c-accent);
     border-radius: 50%; animation: spin .8s linear infinite;
     transform: translate(-50%, -50%); z-index: 2;
   }
 
-  /* Param groups → card visual */
+  /* ── Param groups ── */
   .param-group {
     background: #111; border: 1px solid #1e1e1e;
     border-radius: 10px; padding: 14px; margin-bottom: 10px;
   }
   .param-group-title { padding-bottom: 8px; border-bottom: 1px solid #222; margin-bottom: 10px; }
 
-  /* Sidebar scrollbar styling */
+  /* ── Day card header: accent bottom border ── */
+  .day-card-header { border-bottom: 2px solid rgba(255,0,128,0.15); }
+
+  /* ── Profile field values ── */
+  .field-value { border-bottom: 1px dashed rgba(255,0,128,0.15); transition: background var(--transition-fast), border-color var(--transition-fast); }
+  .field-value:hover { border-bottom-color: rgba(255,0,128,0.4); }
+
+  /* ── Influencer panel button active ── */
+  .btn-seleccionar-inf.active { box-shadow: 0 0 8px rgba(74,222,128,0.25); }
+
+  /* ── Sidebar scrollbar ── */
   #influencers-panel { scrollbar-width: thin; scrollbar-color: #333 #0D0D0D; }
   #influencers-panel::-webkit-scrollbar { width: 4px; }
   #influencers-panel::-webkit-scrollbar-track { background: #0D0D0D; }
   #influencers-panel::-webkit-scrollbar-thumb { background: #333; border-radius: 2px; }
   #influencers-panel::-webkit-scrollbar-thumb:hover { background: #444; }
 
-  /* Influencer card active → más visible */
-  .influencer-card.active { border-width: 2px; box-shadow: 0 0 12px rgba(74,222,128,0.12); }
-  .btn-seleccionar-inf.active { box-shadow: 0 0 8px rgba(74,222,128,0.25); }
+  /* ── Workspace scrollbar ── */
+  #workspace { scrollbar-width: thin; scrollbar-color: #2a2a2a transparent; }
+  #workspace::-webkit-scrollbar { width: 5px; }
+  #workspace::-webkit-scrollbar-track { background: transparent; }
+  #workspace::-webkit-scrollbar-thumb { background: #2a2a2a; border-radius: 3px; }
 
-  /* Field values → hint de editabilidad */
-  .field-value { border-bottom: 1px dashed rgba(255,0,128,0.18); }
-  .field-value:hover { border-bottom-color: rgba(255,0,128,0.42); }
-
-  /* Responsive sidebar */
-  @media (max-width: 960px) {
-    #influencers-panel { width: 200px; }
-    #workspace { padding: 28px 32px; }
+  /* ── Mobile breakpoints ── */
+  @media (max-width: 900px) {
+    #influencers-panel { width: 220px; }
+    #workspace { padding: 24px 28px; }
     .influencers-grid { grid-template-columns: 1fr; }
+    h1 { font-size: 2.4rem; }
+  }
+  @media (max-width: 680px) {
+    .container { flex-direction: column; height: auto; overflow: auto; }
+    #influencers-panel { width: 100%; height: auto; border-right: none; border-bottom: 1px solid #1a1a1a; flex-direction: row; flex-wrap: wrap; }
+    #workspace { height: auto; overflow: visible; padding: 20px 16px; }
+    body { overflow: auto; height: auto; }
+    .influencers-grid { grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); flex: 1; padding: 8px; }
+    .btn-nueva { width: auto; padding: 14px 20px; }
+    .two-col { grid-template-columns: 1fr; }
+    .result-images { flex-direction: column; }
+    .calendar-grid { grid-template-columns: 1fr; }
+    h1 { font-size: 2rem; }
+  }
+  @media (max-width: 400px) {
+    #workspace { padding: 16px 12px; }
+  }
+
+  /* ── Accessibility: respect reduced motion ── */
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+    .toggle-body { transition: none !important; }
   }
 
   /* ── Landing Hero ─────────────────────────────────────── */
@@ -739,7 +896,7 @@
 const POLL_INTERVAL = 8000
 
 // ── Hero photo — pega aquí la URL de tu modelo hero ──────────────────────────
-const HERO_PHOTO_URL = 'https://comfy-deploy-output.s3.us-east-2.amazonaws.com/outputs/runs/0d64074a-92b0-4713-8ff8-41a91b832b76/ComfyUI_00001_.png'
+const HERO_PHOTO_URL = '/hero-photo.png'
 
 // ── AION params definition ────────────────────────────────────────────────────
 const AION_PARAMS = [
