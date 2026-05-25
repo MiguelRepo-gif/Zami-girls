@@ -1,4 +1,4 @@
-# Zami AI Studio — Documentación Técnica v4 AION
+# Zami AI Studio — Documentación Técnica v5 AION
 
 ## REGLA ABSOLUTA — COMANDOS SIEMPRE COMPLETOS
 
@@ -45,7 +45,21 @@ El usuario configura el rostro manualmente vía AION (imágenes de referencia + 
 - `data/influencers.json` — persistencia local de influencers y su historial de semanas
 
 **Carpeta local:** `C:\Users\LENOVO\zami-ai-studio-dev`
+**Repositorio GitHub:** `https://github.com/Se7en198/zami-ai-studio-dev`
 **Rama activa:** `main`
+
+**Sincronizar cambios:**
+```
+cd C:\Users\LENOVO\zami-ai-studio-dev
+git pull origin main
+```
+**Publicar cambios a GitHub:**
+```
+cd C:\Users\LENOVO\zami-ai-studio-dev
+git add -p
+git commit -m "descripción del cambio"
+git push origin main
+```
 
 ---
 
@@ -55,12 +69,16 @@ El usuario configura el rostro manualmente vía AION (imágenes de referencia + 
 El browser abre `http://127.0.0.1:3333` — siempre IPv4, nunca `localhost`.
 El servidor lee `.env` automáticamente al arrancar. No necesita `npm install`.
 
-### Pipeline AION v4 — Fase 1: Generación de Rostro (Manual)
+### Pipeline AION v5 — Fase 1: Generación de Rostro (dos modos)
 
-El usuario configura el nombre, nicho y parámetros de rostro, luego hace clic en **"▶ Generar influencer completa"**. La UI muestra 4 pasos animados:
+La UI tiene un tab switcher con **dos modos de creación de rostro**. Ambos comparten los campos nombre, nicho y tipo de foto. El usuario elige el modo y hace clic en el botón principal. La UI muestra 4 pasos animados.
+
+#### Modo A — Creación Manual (tab "Creación Manual")
+
+El usuario configura parámetros directamente y hace clic en **"Generar Rostro AION"**:
 
 ```
-PASO 1 — Generación de rostro con AION
+PASO 1 — Generación de rostro con AION (Modo Manual)
   Browser: POST /api/generate-face {
     photo_type,           ← siempre requerido
     images: {             ← solo si toggle A está ON (9 slots)
@@ -98,7 +116,49 @@ PASO 4 — Perfil AI Persona
   Result:  perfil completo en texto → renderizado como profile card editable
 ```
 
-### Upload de imágenes de referencia (Toggle A)
+#### Modo B — Creación con Claude (tab "✦ Crear con Claude")
+
+El usuario escribe una descripción en lenguaje natural y opcionalmente adjunta imágenes de referencia para Claude (hasta 4). Claude analiza todo, selecciona los 43 parámetros AION óptimos y dispara la generación automáticamente. El botón muestra **"✦ Generar con Claude"**.
+
+```
+PASO 1 — Claude elige params → AION genera rostro
+  Browser: POST /api/claude-guided-face {
+    description: "mujer francesa, labios carnosos, ojos azules...",
+    photo_type:  "Studio white background",
+    reference_images: [           ← opcional, hasta 4 imágenes
+      { type: "image/jpeg", data: "<base64>" }
+    ]
+  }
+  Server:  POST Anthropic /v1/messages
+           system: AION_EXPERT_SYSTEM_PROMPT (experto en los 43 params)
+           content: [ ...imágenes base64..., descripción del usuario ]
+           Claude devuelve JSON puro con los 43 params seleccionados
+  Server:  POST ComfyDeploy /api/run/deployment/queue
+           deployment_id: c6e6b7f0-e574-4aa8-9012-54e8507202e2
+           inputs: { photo_type, "imagen final": "Nano Banana Pro", ...params_de_claude }
+  Server:  devuelve { runId, selected_params }
+  Browser: muestra resumen de params elegidos por Claude
+  Browser: polling GET /api/status/:runId cada 8s
+  Result:  URL de imagen de rostro → se muestra en pantalla
+
+PASOS 2, 3, 4 — idénticos al Modo Manual
+  La descripción del usuario se pasa como face_description al body-prompt.
+```
+
+**Diferencia clave de las imágenes de referencia en Modo B:**
+- Son para Claude únicamente — Claude las analiza y extrae rasgos para elegir params
+- Se envían como base64 directo al API de Anthropic (NO se suben a Supabase)
+- NO se pasan a los ExternalImage slots del workflow AION
+- Son distintas a las imágenes de referencia del Toggle A (Modo Manual)
+
+**AION_EXPERT_SYSTEM_PROMPT** — hardcodeado en `server.cjs`, contiene:
+- Los 43 params con sus opciones exactas extraídas del workflow JSON
+- Instrucciones para optimizar belleza máxima y realismo fotográfico
+- Regla: defects group siempre "none" salvo que el usuario pida lo contrario
+- Regla: nunca usar "auto" — siempre elegir el mejor valor disponible
+- Output: JSON puro, sin markdown, sin explicación
+
+### Upload de imágenes de referencia (Toggle A — Modo Manual)
 
 El workflow AION usa `ExternalImage (ComfyUI Deploy)` nodes conectados directamente al `AionThetaNode`. Cuando se manda una URL, AION la usa. Cuando no se manda, el input es `None` y AION lo ignora nativamente.
 
@@ -282,7 +342,8 @@ POST https://api.anthropic.com/v1/messages
 |---|---|---|---|
 | `GET` | `/` | — | Sirve server-ui.html |
 | `POST` | `/api/upload-image` | `{ name, data: base64, type }` | Sube imagen a Supabase Storage → `{ url }` |
-| `POST` | `/api/generate-face` | `{ photo_type, images?, params?, prompt? }` | AION face generation |
+| `POST` | `/api/generate-face` | `{ photo_type, images?, params?, prompt? }` | AION face generation — Modo Manual |
+| `POST` | `/api/claude-guided-face` | `{ description, photo_type, reference_images? }` | Claude elige params → AION genera rostro — Modo Claude |
 | `POST` | `/api/generate-body-prompt` | `{ nombre, nicho, face_description }` | Claude genera prompt de cuerpo |
 | `POST` | `/api/generate-body` | `{ prompt, input_image }` | Genera cuerpo en ComfyDeploy |
 | `POST` | `/api/generate-persona` | `{ nombre, nicho, face_url, body_url }` | Claude genera AI Persona |
@@ -337,7 +398,8 @@ VITE_FAL_API_KEY=
 
 | Fase | Nombre | Motor | Estado |
 |---|---|---|---|
-| 1 | Generación de Rostro AION | ComfyDeploy `c6e6b7f0` | ✅ Operativo |
+| 1a | Generación de Rostro — Modo Manual | ComfyDeploy `c6e6b7f0` | ✅ Operativo |
+| 1b | Generación de Rostro — Modo Claude | Anthropic `claude-sonnet-4-6` + ComfyDeploy `c6e6b7f0` | ✅ Operativo |
 | 2 | Prompt de Cuerpo | Anthropic `claude-sonnet-4-6` | ✅ Operativo |
 | 3 | Generación de Cuerpo | ComfyDeploy `cabf22a3` | ✅ Operativo |
 | 4 | Perfil AI Persona | Anthropic `claude-sonnet-4-6` | ✅ Operativo |
@@ -398,7 +460,8 @@ ONE photograph. Portrait orientation. Instagram-ready. Sexy, real, aspirational.
 
 ## DECISIONES TÉCNICAS IMPORTANTES
 
-- **Sin AI face prompt** — El rostro es 100% manual vía AION.
+- **Dos modos de Fase 1** — Manual (3 toggles) y Claude-guided (descripción natural + imágenes para Claude).
+- **Modo Claude: images solo para Anthropic** — Las imágenes de referencia del modo Claude van en base64 directo a la API de Anthropic, NO a Supabase ni a AION. Son para análisis de rasgos, no para inyección al workflow.
 - **ExternalImage nodes directos** — el workflow AION v4 conecta `ExternalImage` directo al `AionThetaNode`. Sin `LoadImage` hardcodeados. Input `None` = AION lo ignora.
 - **Toggle = omit** — cuando un toggle está OFF, esas keys se omiten del payload completamente.
 - **Upload Supabase antes de ComfyDeploy** — imágenes de referencia van a Supabase primero, luego URL pública a ComfyDeploy.

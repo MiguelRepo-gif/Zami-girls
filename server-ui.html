@@ -229,6 +229,21 @@
 
   /* ── Supabase notice ─────────────────────────────────── */
   .notice { font-size: 0.75rem; color: #666; background: #111; border: 1px solid #222; border-radius: 8px; padding: 8px 12px; margin-top: 10px; line-height: 1.5 }
+
+  /* ── Mode Tabs ───────────────────────────────────────── */
+  .mode-tabs { display: flex; gap: 4px; margin-top: 14px; margin-bottom: 4px; background: #111; border-radius: 10px; padding: 4px }
+  .mode-tab { flex: 1; padding: 9px 16px; background: transparent; border: none; border-radius: 8px; color: #666; font-size: 0.85rem; font-weight: 600; cursor: pointer; transition: background .15s, color .15s }
+  .mode-tab.active { background: #e85d8a22; color: #e85d8a; border: 1px solid #e85d8a44 }
+  .mode-tab:hover:not(.active):not(:disabled) { color: #ccc; background: #1a1a1a }
+
+  /* ── Claude Mode Section ─────────────────────────────── */
+  .claude-ref-slots { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 10px; margin-top: 8px }
+  .claude-hint { font-size: 0.75rem; color: #555; background: #111; border: 1px solid #1e1e1e; border-radius: 8px; padding: 8px 12px; margin-top: 12px; line-height: 1.5 }
+  .claude-params-summary { background: #111; border: 1px solid #1e1e1e; border-radius: 10px; padding: 12px 14px; margin-top: 12px }
+  .claude-params-summary-title { font-size: 0.72rem; font-weight: 700; color: #e85d8a; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px }
+  .claude-params-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 3px 10px }
+  .claude-param-item { font-size: 0.72rem; color: #666 }
+  .claude-param-item span { color: #bbb }
 </style>
 </head>
 <body>
@@ -278,46 +293,72 @@
         </select>
       </div>
 
-      <!-- Toggle A: Imágenes de referencia -->
-      <div class="toggle-section">
-        <div class="toggle-header" onclick="toggleSection('images')">
-          <button class="toggle-switch" id="switch-images" onclick="event.stopPropagation();toggleSection('images')"></button>
-          <span class="toggle-label">Imágenes de referencia</span>
-          <span class="toggle-hint" id="hint-images">0 imágenes subidas</span>
-        </div>
-        <div class="toggle-body" id="body-images">
-          <div class="img-slots" id="img-slots"></div>
-          <div class="notice">Las imágenes se suben a Supabase Storage y se pasan al workflow AION como referencia visual. Requiere <code>VITE_SUPABASE_URL</code> y <code>VITE_SUPABASE_ANON_KEY</code> en el .env y un bucket público llamado <code>zami-images</code>.</div>
-        </div>
+      <!-- Mode Tabs -->
+      <div class="mode-tabs">
+        <button id="tab-manual" class="mode-tab active" onclick="switchMode('manual')">Creación Manual</button>
+        <button id="tab-claude" class="mode-tab" onclick="switchMode('claude')">✦ Crear con Claude</button>
       </div>
 
-      <!-- Toggle B: Parámetros detallados -->
-      <div class="toggle-section">
-        <div class="toggle-header" onclick="toggleSection('params')">
-          <button class="toggle-switch" id="switch-params" onclick="event.stopPropagation();toggleSection('params')"></button>
-          <span class="toggle-label">Parámetros detallados</span>
-          <span class="toggle-hint" id="hint-params">43 parámetros — todos en auto</span>
+      <!-- Manual mode section -->
+      <div id="manual-mode-section">
+        <!-- Toggle A: Imágenes de referencia -->
+        <div class="toggle-section">
+          <div class="toggle-header" onclick="toggleSection('images')">
+            <button class="toggle-switch" id="switch-images" onclick="event.stopPropagation();toggleSection('images')"></button>
+            <span class="toggle-label">Imágenes de referencia</span>
+            <span class="toggle-hint" id="hint-images">0 imágenes subidas</span>
+          </div>
+          <div class="toggle-body" id="body-images">
+            <div class="img-slots" id="img-slots"></div>
+            <div class="notice">Las imágenes se suben a Supabase Storage y se pasan al workflow AION como referencia visual. Requiere <code>VITE_SUPABASE_URL</code> y <code>VITE_SUPABASE_ANON_KEY</code> en el .env y un bucket público llamado <code>zami-images</code>.</div>
+          </div>
         </div>
-        <div class="toggle-body" id="body-params">
-          <div id="params-grid"></div>
-        </div>
-      </div>
 
-      <!-- Toggle C: Prompt libre -->
-      <div class="toggle-section">
-        <div class="toggle-header" onclick="toggleSection('prompt')">
-          <button class="toggle-switch" id="switch-prompt" onclick="event.stopPropagation();toggleSection('prompt')"></button>
-          <span class="toggle-label">Prompt libre</span>
-          <span class="toggle-hint">Texto adicional para AION</span>
+        <!-- Toggle B: Parámetros detallados -->
+        <div class="toggle-section">
+          <div class="toggle-header" onclick="toggleSection('params')">
+            <button class="toggle-switch" id="switch-params" onclick="event.stopPropagation();toggleSection('params')"></button>
+            <span class="toggle-label">Parámetros detallados</span>
+            <span class="toggle-hint" id="hint-params">43 parámetros — todos en auto</span>
+          </div>
+          <div class="toggle-body" id="body-params">
+            <div id="params-grid"></div>
+          </div>
         </div>
-        <div class="toggle-body" id="body-prompt">
-          <textarea id="free-prompt" placeholder="Ej: mujer muy sexy con cabello negro, ojos azules, foxy eyes..." rows="3"></textarea>
+
+        <!-- Toggle C: Prompt libre -->
+        <div class="toggle-section">
+          <div class="toggle-header" onclick="toggleSection('prompt')">
+            <button class="toggle-switch" id="switch-prompt" onclick="event.stopPropagation();toggleSection('prompt')"></button>
+            <span class="toggle-label">Prompt libre</span>
+            <span class="toggle-hint">Texto adicional para AION</span>
+          </div>
+          <div class="toggle-body" id="body-prompt">
+            <textarea id="free-prompt" placeholder="Ej: mujer muy sexy con cabello negro, ojos azules, foxy eyes..." rows="3"></textarea>
+          </div>
         </div>
-      </div>
+      </div><!-- end manual-mode-section -->
+
+      <!-- Claude mode section -->
+      <div id="claude-mode-section" style="display:none">
+        <div style="margin-top:8px">
+          <label for="claude-description">Describe a tu influencer</label>
+          <textarea id="claude-description" rows="4" placeholder="Ej: mujer francesa con labios carnosos, ojos azules profundos, cejas delgadas, belleza tierna pero sexy, pómulos altos, pelo oscuro y liso, tono de piel claro..."></textarea>
+        </div>
+        <div style="margin-top:14px">
+          <label>Imágenes de referencia para Claude <span style="font-weight:400;color:#555;text-transform:none;letter-spacing:0">(opcional — Claude analiza los rasgos, no copia la imagen)</span></label>
+          <div class="claude-ref-slots" id="claude-ref-slots"></div>
+        </div>
+        <div id="claude-params-summary" class="claude-params-summary" style="display:none">
+          <div class="claude-params-summary-title">Parámetros elegidos por Claude</div>
+          <div class="claude-params-grid" id="claude-params-grid"></div>
+        </div>
+        <p class="claude-hint">Claude analizará tu descripción e imágenes de referencia, seleccionará los 43 parámetros AION óptimos y lanzará la generación automáticamente.</p>
+      </div><!-- end claude-mode-section -->
 
       <!-- Generate button -->
       <div class="row" style="margin-top:16px">
-        <button id="btn-main" onclick="generateAll()">Generar Rostro AION</button>
+        <button id="btn-main" onclick="handleGenerate()">Generar Rostro AION</button>
       </div>
     </div>
 
@@ -503,10 +544,15 @@ const sectionState = { images: false, params: false, prompt: false }
 // Image URLs (filled by upload)
 const uploadedImages = {}
 
+// Mode state
+let currentMode    = 'manual'
+let claudeRefImages = []  // array of { type, data: base64 } — for Claude only, not sent to AION
+
 // ── Init ─────────────────────────────────────────────────────────────────────
 window.addEventListener('DOMContentLoaded', () => {
   buildImageSlots()
   buildParamsGrid()
+  buildClaudeRefSlots()
   loadInfluencers()
 })
 
@@ -693,6 +739,190 @@ function buildFaceDescription(inputs) {
     }
   }
   return parts.join(', ')
+}
+
+// ── Mode switching ────────────────────────────────────────────────────────────
+function switchMode(mode) {
+  currentMode = mode
+  document.getElementById('manual-mode-section').style.display = mode === 'manual' ? 'block' : 'none'
+  document.getElementById('claude-mode-section').style.display = mode === 'claude' ? 'block' : 'none'
+  document.getElementById('tab-manual').classList.toggle('active', mode === 'manual')
+  document.getElementById('tab-claude').classList.toggle('active', mode === 'claude')
+  document.getElementById('btn-main').textContent = mode === 'claude' ? '✦ Generar con Claude' : 'Generar Rostro AION'
+}
+
+function handleGenerate() {
+  if (currentMode === 'claude') generateWithClaude()
+  else generateAll()
+}
+
+// ── Claude ref image slots ────────────────────────────────────────────────────
+function buildClaudeRefSlots() {
+  const container = document.getElementById('claude-ref-slots')
+  if (!container) return
+  container.innerHTML = ''
+  for (let i = 0; i < 4; i++) {
+    const div = document.createElement('div')
+    div.className = 'img-slot'
+    div.id = `claude-ref-slot-${i}`
+    div.innerHTML = `
+      <button class="btn-remove-img" onclick="removeClaudeRefImage(${i}, event)" title="Quitar">×</button>
+      <img class="img-slot-preview" id="claude-ref-preview-${i}" src="" alt="">
+      <div class="img-slot-icon">+</div>
+      <div class="img-slot-name">Ref. ${i + 1}</div>
+      <div class="img-slot-status" id="claude-ref-status-${i}">Para Claude</div>
+      <input type="file" accept="image/*" onchange="handleClaudeRefImage(${i}, this)" title="Imagen de referencia ${i + 1}">
+    `
+    container.appendChild(div)
+  }
+}
+
+async function handleClaudeRefImage(index, input) {
+  const file = input.files[0]
+  if (!file) return
+  const slotEl   = document.getElementById(`claude-ref-slot-${index}`)
+  const statusEl = document.getElementById(`claude-ref-status-${index}`)
+  const previewEl = document.getElementById(`claude-ref-preview-${index}`)
+  slotEl.classList.remove('loaded')
+  slotEl.classList.add('uploading')
+  statusEl.textContent = 'Leyendo...'
+  try {
+    const base64 = await fileToBase64(file)
+    claudeRefImages[index] = { type: file.type, data: base64 }
+    const objUrl = URL.createObjectURL(file)
+    if (previewEl._objUrl) URL.revokeObjectURL(previewEl._objUrl)
+    previewEl._objUrl = objUrl
+    previewEl.src = objUrl
+    slotEl.classList.remove('uploading')
+    slotEl.classList.add('loaded')
+    statusEl.textContent = 'Lista'
+  } catch (err) {
+    slotEl.classList.remove('uploading')
+    statusEl.textContent = 'Error'
+    console.error('Claude ref image error:', err)
+  }
+}
+
+function removeClaudeRefImage(index, event) {
+  event.stopPropagation()
+  const slotEl   = document.getElementById(`claude-ref-slot-${index}`)
+  const statusEl = document.getElementById(`claude-ref-status-${index}`)
+  const previewEl = document.getElementById(`claude-ref-preview-${index}`)
+  claudeRefImages[index] = null
+  if (previewEl._objUrl) { URL.revokeObjectURL(previewEl._objUrl); previewEl._objUrl = null }
+  previewEl.src = ''
+  slotEl.classList.remove('loaded')
+  statusEl.textContent = 'Para Claude'
+}
+
+function renderClaudeParamsSummary(params) {
+  const summaryEl = document.getElementById('claude-params-summary')
+  const gridEl    = document.getElementById('claude-params-grid')
+  if (!summaryEl || !gridEl || !params) return
+  const entries = Object.entries(params).filter(([, v]) => v && v !== 'auto')
+  if (!entries.length) { summaryEl.style.display = 'none'; return }
+  summaryEl.style.display = 'block'
+  gridEl.innerHTML = entries.map(([k, v]) =>
+    `<div class="claude-param-item">${k.replace(/_/g, ' ')}: <span>${escHtml(v)}</span></div>`
+  ).join('')
+}
+
+// ── Claude-guided face generation ────────────────────────────────────────────
+async function generateWithClaude() {
+  const nombre      = document.getElementById('nombre').value.trim()
+  const nicho       = document.getElementById('nicho').value.trim()
+  const description = document.getElementById('claude-description').value.trim()
+  const photoType   = document.getElementById('photo-type').value
+  const btn         = document.getElementById('btn-main')
+
+  if (!nombre)      { alert('Escribe el nombre de la influencer.'); return }
+  if (!nicho)       { alert('Escribe el nicho de contenido.'); return }
+  if (!description) { alert('Describe a tu influencer para que Claude pueda crear el rostro.'); return }
+
+  btn.disabled = true
+  generatedFaceUrl     = null
+  generatedBodyUrl     = null
+  generatedPersonaText = null
+
+  document.getElementById('claude-params-summary').style.display = 'none'
+  for (let i = 1; i <= 4; i++) setStep(i, 'pending', '')
+  document.getElementById('progress-section').style.display = 'block'
+  document.getElementById('result-section').style.display = 'none'
+  document.getElementById('result-face-img').style.display = 'none'
+  document.getElementById('result-face-placeholder').style.display = 'flex'
+  document.getElementById('result-body-img').style.display = 'none'
+  document.getElementById('result-body-placeholder').style.display = 'flex'
+  document.getElementById('persona-output').innerHTML = ''
+  document.getElementById('copy-wrap').style.display = 'none'
+  document.getElementById('save-influencer-row').style.display = 'none'
+
+  try {
+    // ── Paso 1: Claude elige params → AION genera rostro
+    const refCount = claudeRefImages.filter(Boolean).length
+    setStep(1, 'active', `Claude analizando descripción${refCount > 0 ? ` + ${refCount} imagen(es)` : ''}...`)
+
+    const r1 = await apiFetch('/api/claude-guided-face', {
+      description,
+      photo_type:       photoType,
+      reference_images: claudeRefImages.filter(Boolean),
+    })
+
+    renderClaudeParamsSummary(r1.selected_params)
+    setStep(1, 'active', `Params elegidos — AION generando (run: ${r1.runId.slice(0, 8)}...) — 1–5 min`)
+    generatedFaceUrl = await pollForImage(r1.runId, 1)
+
+    document.getElementById('result-section').style.display = 'block'
+    document.getElementById('result-face-placeholder').style.display = 'none'
+    const faceImg = document.getElementById('result-face-img')
+    faceImg.src = generatedFaceUrl; faceImg.style.display = 'block'
+    setStep(1, 'done', 'Rostro generado con parámetros elegidos por Claude')
+
+    // ── Paso 2: Prompt de cuerpo
+    setStep(2, 'active', 'Claude generando prompt de cuerpo...')
+    const r2 = await apiFetch('/api/generate-body-prompt', { nombre, nicho, face_description: description })
+    setStep(2, 'done', r2.prompt)
+
+    // ── Paso 3: Cuerpo con ComfyDeploy
+    setStep(3, 'active', 'Enviando a ComfyDeploy...')
+    const r3 = await apiFetch('/api/generate-body', { prompt: r2.prompt, input_image: generatedFaceUrl })
+    const bodyRunId = r3.runIds[0]
+    setStep(3, 'active', `En cola (run: ${bodyRunId.slice(0, 8)}...) — puede tardar 1–5 min`)
+    generatedBodyUrl = await pollForImage(bodyRunId, 3)
+
+    document.getElementById('result-body-placeholder').style.display = 'none'
+    const bodyImg = document.getElementById('result-body-img')
+    bodyImg.src = generatedBodyUrl; bodyImg.style.display = 'block'
+    setStep(3, 'done', 'Cuerpo generado')
+
+    // ── Paso 4: Perfil AI Persona
+    setStep(4, 'active', 'Claude generando perfil completo... (~30 seg)')
+    const r4 = await apiFetch('/api/generate-persona', { nombre, nicho, face_url: generatedFaceUrl, body_url: generatedBodyUrl })
+    generatedPersonaText = r4.persona
+    renderPersona(r4.persona, nombre, nicho)
+    setStep(4, 'done', `Perfil de ${nombre} listo`)
+
+    document.getElementById('copy-wrap').style.display = 'flex'
+    document.getElementById('save-influencer-row').style.display = 'flex'
+    document.getElementById('btn-save-influencer').disabled = false
+    document.getElementById('btn-save-influencer').textContent = 'Guardar Influencer'
+    document.getElementById('save-influencer-status').textContent = ''
+
+    syncPhase4Thumbs()
+    document.getElementById('p4-influencer-label').textContent = `${nombre} · ${nicho}`
+    document.getElementById('btn-generate-plan').disabled = false
+    setContentPlanStatus('Listo. Clic en "Generar Plan Semanal" para comenzar.')
+
+    document.getElementById('result-section').scrollIntoView({ behavior: 'smooth', block: 'start' })
+  } catch (err) {
+    console.error(err)
+    for (let i = 1; i <= 4; i++) {
+      if (document.getElementById(`step-${i}`).classList.contains('active')) {
+        setStep(i, 'error', err.message); break
+      }
+    }
+  } finally {
+    btn.disabled = false
+  }
 }
 
 // ── Influencers persistence ───────────────────────────────────────────────────

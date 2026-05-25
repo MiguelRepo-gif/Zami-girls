@@ -437,6 +437,126 @@ FORMATO: ÚNICAMENTE JSON válido. Sin markdown.
   })
 }
 
+// ── AION Expert Params — Claude selects from natural language ────────────────
+const AION_EXPERT_SYSTEM_PROMPT = `You are AION Casting Director, a world-class expert in creating hyperrealistic virtual influencer faces for AI image generation workflows.
+
+Your task: analyze the user's description (and reference images if provided) and select the optimal AION parameters to generate the most beautiful, sexy, and photorealistic face possible.
+
+STRICT RULES:
+1. Optimize for maximum beauty and photographic realism within the requested traits
+2. For traits not specified, choose the most photogenic and beautiful option — no lazy defaults
+3. AVOID "auto" — choose a specific value for every single parameter
+4. Result must look like a real photograph, NOT AI-generated
+5. Skin: prefer natural, realistic texture — "natural skin grain", "natural pore variation", "none visible" imperfections
+6. Defects group (wrinkles, scars, deformations, tone_loss, skin_marks, vitiligo, under_eye): ALWAYS use "none" unless the user explicitly requests otherwise
+7. Expression: default to "serene neutral" or "gentle warmth" for beauty/influencer shots
+8. If reference images are provided: carefully extract specific aesthetic traits and map them to the closest parameter values
+9. Sex: default to "female" unless specified otherwise
+
+AVAILABLE PARAMETERS — use ONLY these exact strings:
+sex: ["auto","unspecified","female","male","androgynous"]
+ethnicity: ["auto","unspecified","East Asian","South Asian","Southeast Asian","Central Asian","Middle Eastern","North African","Horn of Africa","Sub-Saharan African","Northern European","Southern European","Eastern European","Western European","North American","Latin American","Mestizo","Caribbean","Indigenous American","Pacific Islander","Melanesian","Australian Aboriginal","Mixed heritage"]
+eye_shape: ["auto","almond-shaped","round","hooded","monolid","upturned","downturned","deep-set","prominent","wide-set","close-set"]
+eye_size: ["auto","small","medium","large","very large","proportionate"]
+eye_tilt: ["auto","neutral tilt","slight upward tilt","moderate upward tilt","slight downward tilt","horizontal"]
+eye_color: ["auto","dark brown","medium brown","light brown","hazel","amber","green","blue-green","light blue","deep blue","gray","dark gray","black"]
+eyebrow_thickness: ["auto","thin","medium thickness","thick","very thick","sparse","dense and full"]
+eyebrow_shape: ["auto","straight","soft arch","high arch","rounded","angled","flat","S-shaped","naturally unruly"]
+eyebrow_color: ["auto","black","dark brown","medium brown","light brown","auburn","dark blonde","blonde","gray","reddish brown"]
+nose_profile: ["auto","straight profile","slightly concave","slightly convex","aquiline","button nose profile","flat bridge","high bridge","broad bridge","narrow bridge"]
+nose_base: ["auto","narrow base","medium base","wide base","flared nostrils","compact nostrils","rounded base","angular base"]
+nose_tip: ["auto","rounded tip","pointed tip","bulbous tip","upturned tip","downturned tip","refined tip","broad tip","narrow tip"]
+lips_volume: ["auto","thin lips","medium volume","full lips","very full lips","naturally plump","delicate and refined"]
+cupid_bow: ["auto","pronounced cupid's bow","subtle cupid's bow","flat cupid's bow","heart-shaped cupid's bow","rounded cupid's bow","sharply defined bow"]
+lips_proportion: ["auto","balanced upper and lower","fuller lower lip","fuller upper lip","equal proportion","slightly fuller lower","slightly fuller upper"]
+lips_color: ["auto","soft pink","rosy pink","mauve","dusty rose","berry toned","warm peach","neutral beige","deep rose","brownish pink","coral toned"]
+forehead: ["auto","broad forehead","narrow forehead","high forehead","low forehead","slightly rounded","flat forehead","prominent forehead","average proportion"]
+cheekbones: ["auto","high cheekbones","low cheekbones","prominent cheekbones","subtle cheekbones","wide-set cheekbones","angular cheekbones","soft rounded cheekbones","flat cheekbones"]
+jawline: ["auto","strong jawline","soft jawline","angular jawline","rounded jawline","square jawline","tapered jawline","wide jaw","narrow jaw","defined jawline"]
+chin: ["auto","pointed chin","rounded chin","square chin","narrow chin","broad chin","prominent chin","receding chin","cleft chin","soft chin"]
+cheeks: ["auto","full cheeks","hollow cheeks","soft rounded cheeks","flat cheeks","naturally plump","slightly sunken","apple cheeks","lean cheeks"]
+submental: ["auto","tight submental area","soft submental area","defined under-chin","slight fullness","clean jawline transition","natural softness"]
+face_neck_transition: ["auto","smooth transition","defined angle","soft gradual transition","sharp jaw-neck angle","naturally blended","elongated neck line"]
+hair_structure: ["auto","straight","wavy","curly","coily","kinky","loosely wavy","tightly curled","fine and silky","coarse and thick"]
+hair_length: ["auto","buzz cut","very short","short","ear length","chin length","shoulder length","mid-back length","long","very long","bald","shaved sides"]
+hair_volume: ["auto","flat and sleek","low volume","medium volume","high volume","very voluminous","thick and dense","thin and fine","fluffy"]
+hair_color: ["auto","jet black","dark brown","medium brown","light brown","dark blonde","golden blonde","platinum blonde","strawberry blonde","auburn","copper red","deep red","silver gray","white","salt and pepper"]
+skin_tone: ["auto","very fair","fair","light","light-medium","medium","medium-tan","tan","olive","deep tan","brown","dark brown","deep brown","ebony"]
+skin_undertone: ["auto","cool undertone","warm undertone","neutral undertone","olive undertone","pink undertone","golden undertone","peach undertone","red undertone"]
+skin_texture: ["auto","smooth natural grain","fine skin texture","slightly rough texture","soft velvety texture","natural skin grain","matte natural texture"]
+skin_micro_texture: ["auto","visible fine pores","subtle pore detail","barely visible pores","natural pore variation","light textural detail","realistic micro detail"]
+skin_imperfections: ["auto","none visible","light freckles","subtle blemishes","faint redness zones","small moles","soft under-eye shadows","light freckles and moles","minor sun spots","natural skin variation"]
+skin_reflection: ["auto","matte natural finish","soft skin sheen","subtle light diffusion","natural dewy glow","satin finish","minimal shine"]
+wrinkles: ["auto","none","fine forehead lines","crow's feet","nasolabial folds","frown lines","neck wrinkles","deep forehead furrows","perioral wrinkles","under-eye wrinkles","bunny lines","marionette lines","horizontal neck bands"]
+scars: ["auto","none","small facial scar","acne scarring","surgical scar","burn scar","cleft lip scar","eyebrow scar","cheek scar","forehead scar","ice-pick acne scars","boxcar acne scars","rolling acne scars","keloid scar"]
+deformations: ["auto","none","asymmetric features","deviated nose","drooping eyelid","facial paralysis trace","cleft palate trace","micrognathia","prognathism","hemifacial microsomia","facial asymmetry left side","facial asymmetry right side","bell's palsy trace"]
+tone_loss: ["auto","none","mild jowling","sagging cheeks","loose neck skin","drooping brow","hollow temples","sunken cheeks","loose eyelid skin","loss of jawline definition","nasolabial fold deepening","thinning lips from aging","overall facial volume loss"]
+skin_marks: ["auto","none","post-acne dark spots","post-acne red marks","hyperpigmentation patches","melasma","age spots","sun damage spots","cherry angiomas","seborrheic keratosis","port wine stain","cafe au lait spots","liver spots"]
+vitiligo: ["auto","none","perioral vitiligo","periocular vitiligo","forehead vitiligo","hands vitiligo","scattered patches","segmental vitiligo","universal vitiligo","focal vitiligo on cheek","symmetrical facial vitiligo","vitiligo on nose bridge"]
+under_eye: ["auto","none","mild dark circles","deep dark circles","puffy under-eye bags","hollow tear troughs","blue-tinted dark circles","brown-tinted dark circles","hereditary dark circles","malar bags","festoons","crepey under-eye skin"]
+expression: ["auto","neutral","happiness","sadness","anger","surprise","fear","disgust","contempt"]
+expression_variant: ["auto","Duchenne smile","social smile","bitter smile","coy smile","broad grin","closed-lip smile","smirk","radiant joy","gentle warmth","laughing","tearful","melancholic gaze","lip tremble","downcast eyes","subtle grief","resigned sadness","nostalgic sadness","holding back tears","cold fury","simmering rage","tight jaw anger","flared nostrils anger","stern disapproval","controlled anger","frustrated scowl","indignant look","wide-eyed shock","mild surprise","open-mouth gasp","raised brows surprise","stunned disbelief","pleasant surprise","startled","wide-eyed fear","frozen terror","anxious worry","nervous tension","subtle unease","panicked expression","deer-in-headlights","mild distaste","strong revulsion","nose wrinkle disgust","lip curl disgust","nauseated look","subtle aversion","one-sided smirk","dismissive look","superior gaze","subtle disdain","eye-roll contempt","sardonic expression","serene neutral","pensive","stoic","blank stare","composed calm","thoughtful gaze","distant look","wistful","determined"]
+
+OUTPUT RULES:
+- Return ONLY a valid JSON object — no markdown, no code blocks, no explanation, no extra text
+- Include ALL 43 parameters in your response
+- Use ONLY the exact string values listed above
+- Example: {"sex":"female","ethnicity":"Latin American","eye_shape":"almond-shaped",...}`
+
+async function generateAionParams(description, referenceImages, photoType) {
+  const content = []
+
+  if (referenceImages && referenceImages.length > 0) {
+    for (const img of referenceImages) {
+      if (img && img.data && img.type) {
+        content.push({ type: 'image', source: { type: 'base64', media_type: img.type, data: img.data } })
+      }
+    }
+  }
+
+  const typeHint = photoType && photoType !== '-- Not selected / System inferred --'
+    ? `Photo type: "${photoType}"\n\n`
+    : ''
+  content.push({ type: 'text', text: `${typeHint}Influencer description: ${description}` })
+
+  const payload = JSON.stringify({
+    model: 'claude-sonnet-4-6',
+    max_tokens: 1500,
+    system: AION_EXPERT_SYSTEM_PROMPT,
+    messages: [{ role: 'user', content }],
+  })
+
+  return new Promise((resolve, reject) => {
+    const opts = {
+      hostname: 'api.anthropic.com',
+      path: '/v1/messages',
+      method: 'POST',
+      headers: {
+        'x-api-key':         ANTHROPIC_KEY,
+        'anthropic-version': '2023-06-01',
+        'content-type':      'application/json',
+        'content-length':    Buffer.byteLength(payload),
+      },
+    }
+    const req = https.request(opts, res => {
+      let raw = ''
+      res.on('data', d => raw += d)
+      res.on('end', () => {
+        try {
+          const data = JSON.parse(raw)
+          if (res.statusCode !== 200) throw new Error(`Anthropic ${res.statusCode}: ${JSON.stringify(data)}`)
+          let text = data.content[0].text.trim()
+          if (text.startsWith('```')) text = text.replace(/^```(?:json)?\s*\n?/, '').replace(/\n?```\s*$/, '').trim()
+          resolve(JSON.parse(text))
+        } catch (e) { reject(e) }
+      })
+    })
+    req.on('error', reject)
+    req.write(payload)
+    req.end()
+  })
+}
+
 async function getRun(runId) {
   const res = await cdRequest('GET', `/api/run/${runId}`)
   if (res.status !== 200) throw new Error(`Poll ${res.status}`)
@@ -563,6 +683,40 @@ const server = http.createServer(async (req, res) => {
       json(res, 200, { runIds: [runId] })
     } catch (err) {
       console.error('[GENERATE-FACE ERROR]', err.message)
+      json(res, 500, { error: err.message })
+    }
+    return
+  }
+
+  // POST /api/claude-guided-face — Claude selects AION params from natural language + optional ref images
+  if (req.method === 'POST' && pathname === '/api/claude-guided-face') {
+    try {
+      const body        = await readBody(req)
+      const description = (body.description || '').trim()
+      const photoType   = (body.photo_type  || '-- Not selected / System inferred --').trim()
+      const refImages   = body.reference_images || []
+
+      if (!description)   { json(res, 400, { error: 'description requerida' }); return }
+      if (!ANTHROPIC_KEY) { json(res, 500, { error: 'Agrega ANTHROPIC_API_KEY en tu .env' }); return }
+
+      console.log(`\n[CLAUDE-GUIDED] desc="${description.slice(0, 80)}..." refImages=${refImages.filter(Boolean).length} photoType="${photoType}"`)
+
+      const params = await generateAionParams(description, refImages, photoType)
+      console.log(`  Claude seleccionó ${Object.keys(params).length} params`)
+      console.log('  Selected params:', JSON.stringify(params, null, 2))
+
+      const inputs = {
+        'photo_type':   photoType,
+        'imagen final': 'Nano Banana Pro',
+        ...params,
+      }
+
+      const runId = await startAionRun(inputs)
+      console.log(`  run: ${runId}`)
+
+      json(res, 200, { runId, selected_params: params })
+    } catch (err) {
+      console.error('[CLAUDE-GUIDED ERROR]', err.message)
       json(res, 500, { error: err.message })
     }
     return
