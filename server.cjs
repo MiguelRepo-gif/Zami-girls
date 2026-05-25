@@ -13,13 +13,25 @@ function loadEnv() {
   if (!fs.existsSync(envPath)) return
   fs.readFileSync(envPath, 'utf8').split(/\r?\n/).forEach(line => {
     const m = line.match(/^\s*([^#=\s]+)\s*=\s*(.*)$/)
-    if (m) process.env[m[1]] = m[2].trim().replace(/^["']|["']$/g, '')
+    if (m) process.env[m[1]] = cleanEnvValue(m[2])
   })
+}
+
+function cleanEnvValue(value) {
+  let v = value.trim()
+  if (!v) return ''
+  if ((v.startsWith('"') && v.endsWith('"')) || (v.startsWith("'") && v.endsWith("'"))) {
+    return v.slice(1, -1)
+  }
+  const hash = v.search(/\s#/)
+  if (hash !== -1) v = v.slice(0, hash).trim()
+  return v.replace(/^["']|["']$/g, '')
 }
 loadEnv()
 
 const API_KEY               = process.env.VITE_COMFYDEPLOY_API_KEY || ''
 const ANTHROPIC_KEY         = process.env.ANTHROPIC_API_KEY || ''
+const ANTHROPIC_MODEL       = process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-6'
 const DEPLOYMENT_ID_AION    = process.env.VITE_COMFYDEPLOY_AION_DEPLOYMENT_ID || 'c6e6b7f0-e574-4aa8-9012-54e8507202e2'
 const DEPLOYMENT_ID_BODY    = process.env.VITE_COMFYDEPLOY_BODY_DEPLOYMENT_ID || 'cabf22a3-a697-485c-a6df-b6c09ee4f2f1'
 const DEPLOYMENT_ID_CONTENT = process.env.VITE_COMFYDEPLOY_CONTENT_DEPLOYMENT_ID || '8d4702cb-c504-4bf2-8284-ee17d6e66633'
@@ -31,18 +43,40 @@ const HOST                  = '127.0.0.1'
 const CD_BASE               = 'api.comfydeploy.com'
 const DATA_DIR              = path.join(__dirname, 'data')
 const INFLUENCERS_FILE      = path.join(DATA_DIR, 'influencers.json')
+const MAX_JSON_BODY_BYTES   = 25 * 1024 * 1024
+const MAX_UPLOAD_BYTES      = 8 * 1024 * 1024
+const ALLOWED_IMAGE_TYPES   = new Set(['image/jpeg', 'image/png', 'image/webp'])
+const IMAGE_EXTENSIONS      = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' }
+let influencerWriteQueue    = Promise.resolve()
 
 // ── Influencers persistence ──────────────────────────────────────────────────
 function loadInfluencers() {
   if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true })
   if (!fs.existsSync(INFLUENCERS_FILE)) fs.writeFileSync(INFLUENCERS_FILE, JSON.stringify({ influencers: [] }))
   try { return JSON.parse(fs.readFileSync(INFLUENCERS_FILE, 'utf8')) }
-  catch { return { influencers: [] } }
+  catch (err) {
+    const backup = path.join(DATA_DIR, `influencers.corrupt.${Date.now()}.json`)
+    try { fs.copyFileSync(INFLUENCERS_FILE, backup) } catch {}
+    throw new Error(`data/influencers.json corrupto; backup creado en ${path.basename(backup)}. ${err.message}`)
+  }
 }
 
 function saveInfluencers(data) {
   if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true })
-  fs.writeFileSync(INFLUENCERS_FILE, JSON.stringify(data, null, 2))
+  const tmp = `${INFLUENCERS_FILE}.${process.pid}.${Date.now()}.tmp`
+  fs.writeFileSync(tmp, JSON.stringify(data, null, 2))
+  fs.renameSync(tmp, INFLUENCERS_FILE)
+}
+
+function updateInfluencers(mutator) {
+  const job = influencerWriteQueue.then(() => {
+    const data = loadInfluencers()
+    const result = mutator(data)
+    saveInfluencers(data)
+    return result
+  })
+  influencerWriteQueue = job.catch(() => {})
+  return job
 }
 
 // ── ComfyDeploy helpers ──────────────────────────────────────────────────────
@@ -120,7 +154,7 @@ function uploadToSupabase(buffer, filename, contentType) {
   })
 }
 
-// ── Body generation ──────────────────────────────────────────────────────────
+// ── Body generation (legacy — deployment cabf22a3) ───────────────────────────
 async function startBodyRun(prompt, inputImage) {
   const res = await cdRequest('POST', `/api/run/deployment/queue`, {
     deployment_id: DEPLOYMENT_ID_BODY,
@@ -128,6 +162,22 @@ async function startBodyRun(prompt, inputImage) {
       input_image:     String(inputImage),
       filename_prefix: 'ComfyUI',
       prompt:          String(prompt),
+    },
+  })
+  if (res.status !== 200 && res.status !== 201) {
+    throw new Error(`ComfyDeploy ${res.status}: ${JSON.stringify(res.body)}`)
+  }
+  return res.body.run_id
+}
+
+// ── Body generation v2 — Nano Banana Pro (Gemini) via image_rostro (deployment c6e6b7f0) ──
+async function startBodyRunV2(faceUrl, promptBody) {
+  const res = await cdRequest('POST', `/api/run/deployment/queue`, {
+    deployment_id: DEPLOYMENT_ID_AION,
+    inputs: {
+      'image_rostro': String(faceUrl),
+      'prompt_body':  String(promptBody),
+      'save_image':   'ComfyUI',
     },
   })
   if (res.status !== 200 && res.status !== 201) {
@@ -258,7 +308,7 @@ Arquetipo (ej. femme fatale, chica de al lado, CEO baddie): ___
 Fantasía principal que encarna para sus fans: ___` })
 
   const payload = JSON.stringify({
-    model: 'claude-sonnet-4-6',
+    model: ANTHROPIC_MODEL,
     max_tokens: 4000,
     messages: [{ role: 'user', content }],
   })
@@ -311,7 +361,7 @@ The prompt MUST include ALL of the following with maximum specificity:
 Output ONLY the prompt text. No explanations, no quotes, no labels.`
 
   const payload = JSON.stringify({
-    model: 'claude-sonnet-4-6',
+    model: ANTHROPIC_MODEL,
     max_tokens: 500,
     messages: [{ role: 'user', content: promptText }],
   })
@@ -401,7 +451,7 @@ FORMATO: ÚNICAMENTE JSON válido. Sin markdown.
 5 días (dayIndex 0–4), 4 variaciones por día (varIndex 0–3).` })
 
   const payload = JSON.stringify({
-    model: 'claude-sonnet-4-6',
+    model: ANTHROPIC_MODEL,
     max_tokens: 8000,
     messages: [{ role: 'user', content }],
   })
@@ -428,6 +478,93 @@ FORMATO: ÚNICAMENTE JSON válido. Sin markdown.
           let text = data.content[0].text.trim()
           if (text.startsWith('```')) text = text.replace(/^```(?:json)?\s*\n?/, '').replace(/\n?```\s*$/, '').trim()
           resolve(JSON.parse(text))
+        } catch (e) { reject(e) }
+      })
+    })
+    req.on('error', reject)
+    req.write(payload)
+    req.end()
+  })
+}
+
+// ── AION Body Params ─────────────────────────────────────────────────────────
+const BODY_PARAM_OPTIONS = {
+  body_type:            ['hourglass','curvy and voluminous','athletic and toned','slim and lean','petite','tall and lean','fit and curvy','natural proportions'],
+  height_build:         ["petite build (5'1\"-5'3\")","average height (5'4\"-5'6\")","tall build (5'7\"-5'9\")","very tall (5'10\"+)"],
+  bust_size:            ['small bust','medium bust','full bust','large bust','very large bust'],
+  waist_definition:     ['undefined waist','slightly defined waist','well-defined waist','very narrow waist','extreme hourglass waist'],
+  shoulder_width:       ['narrow shoulders','medium shoulders','broad shoulders','athletic shoulders'],
+  hip_width:            ['narrow hips','medium hips','wide hips','very wide hips'],
+  glute_shape:          ['flat glutes','average glutes','round and full glutes','large and prominent glutes','perky and lifted glutes'],
+  waist_hip_ratio:      ['extreme hourglass (0.65-0.70)','classic hourglass (0.70-0.75)','soft curves (0.75-0.80)','straight silhouette (0.80+)'],
+  thigh_shape:          ['slim thighs','medium thighs','thick and full thighs','muscular thighs','inner thigh gap'],
+  leg_length:           ['short legs','average leg length','long legs','very long legs'],
+  leg_shape:            ['slim and straight legs','toned athletic legs','curvy and shapely legs','muscular defined legs'],
+  calf_shape:           ['slim calves','average calves','defined calves','muscular calves'],
+  body_skin_tone_match: ['perfect skin tone continuity from face','slightly lighter body skin','natural sun-kissed variation','uniform flawless skin tone'],
+  body_skin_detail:     ['flawless smooth skin','natural subtle texture','light tan lines','natural skin grain and pores'],
+  body_skin_reflection: ['matte natural skin','subtle natural sheen','soft dewy glow','satin skin finish'],
+}
+
+const BODY_EXPERT_SYSTEM_PROMPT = `You are a precision body prompt engineer for Gemini image generation. You receive 15 body parameters and output a single English prompt that controls ONLY the body in the generated image.
+
+MANDATORY VISUAL RULES — non-negotiable:
+- Pure white background (#FFFFFF), high-key shadowless studio lighting
+- Full body standing shot, head-to-toe, centered, straight-on or slight 3/4 angle
+- Outfit: white seamless bodysuit OR nude-tone form-fitting one-piece swimwear — zero accessories, zero patterns, zero textures. The outfit exists only to reveal body proportions.
+
+PROMPT CONSTRUCTION ORDER:
+1. Height and overall build (1 short sentence using height_build + body_type params)
+2. Upper body: shoulder width, bust size, waist definition (use exact params)
+3. Lower body: waist_hip_ratio, hip width, glute shape, thigh shape, leg length, leg shape, calf shape
+4. Skin: body_skin_tone_match, body_skin_detail, body_skin_reflection
+
+STRICT RULES:
+- Translate each parameter into a concrete anatomical descriptor
+- NO face description, NO hair, NO background beyond white studio
+- NO scene, NO location, NO props
+- All influencers are beautiful, sexy, and aspirational — no exceptions
+- 120–150 words MAX
+- Output ONLY the prompt text. No markdown, no labels, no explanations.`
+
+async function generateBodyPromptFromParams(nombre, nicho, bodyParams, bodyDescription) {
+  const paramLines = Object.entries(BODY_PARAM_OPTIONS)
+    .map(([k, opts]) => {
+      const val = bodyParams && bodyParams[k] ? bodyParams[k] : opts[0]
+      return `${k}: "${val}"`
+    })
+    .join('\n')
+
+  const descLine = bodyDescription ? `\nAdditional body context from user: "${bodyDescription}"` : ''
+  const userMsg = `Influencer name: ${nombre}\nNiche: ${nicho}${descLine}\n\nSelected body parameters:\n${paramLines}`
+
+  const payload = JSON.stringify({
+    model:      ANTHROPIC_MODEL,
+    max_tokens: 300,
+    system:     BODY_EXPERT_SYSTEM_PROMPT,
+    messages:   [{ role: 'user', content: userMsg }],
+  })
+
+  return new Promise((resolve, reject) => {
+    const opts = {
+      hostname: 'api.anthropic.com',
+      path:     '/v1/messages',
+      method:   'POST',
+      headers: {
+        'x-api-key':         ANTHROPIC_KEY,
+        'anthropic-version': '2023-06-01',
+        'content-type':      'application/json',
+        'content-length':    Buffer.byteLength(payload),
+      },
+    }
+    const req = https.request(opts, res => {
+      let raw = ''
+      res.on('data', d => raw += d)
+      res.on('end', () => {
+        try {
+          const data = JSON.parse(raw)
+          if (res.statusCode !== 200) throw new Error(`Anthropic ${res.statusCode}: ${JSON.stringify(data)}`)
+          resolve(data.content[0].text.trim())
         } catch (e) { reject(e) }
       })
     })
@@ -499,11 +636,19 @@ expression_variant: ["auto","Duchenne smile","social smile","bitter smile","coy 
 
 OUTPUT RULES:
 - Return ONLY a valid JSON object — no markdown, no code blocks, no explanation, no extra text
-- Include ALL 43 parameters in your response
-- Use ONLY the exact string values listed above
-- Example: {"sex":"female","ethnicity":"Latin American","eye_shape":"almond-shaped",...}`
+- Include ALL 43 face parameters PLUS the "prompt_body" field (44 fields total)
+- Use ONLY the exact string values listed above for face params
+- "prompt_body": a 150–250 word English prompt for GPT Image 2 describing the full body. Follow this structure:
+  1. Subject: photorealistic full-body portrait of the woman
+  2. Body proportions inferred from her ethnicity/build + niche (fitness=athletic, gamer=soft curvy, fashion=hourglass, etc.)
+  3. Outfit: sexy, form-fitting, niche-appropriate (SFW) — NEVER plain or neutral
+  4. Pose: confident and sexy
+  5. Setting + lighting: cinematic, flattering
+  6. Technical: "full body shot, fashion photography, Sony A7R V, 35mm, 8K, photorealistic, ultra-detailed"
+  All influencers are beautiful and sexy. Skin tone of body must match face skin_tone param.
+- Example: {"sex":"female","ethnicity":"Latin American","eye_shape":"almond-shaped",...,"prompt_body":"A photorealistic full-body portrait..."}`
 
-async function generateAionParams(description, referenceImages, photoType) {
+async function generateAionParams(description, referenceImages, photoType, nombre, nicho) {
   const content = []
 
   if (referenceImages && referenceImages.length > 0) {
@@ -517,10 +662,11 @@ async function generateAionParams(description, referenceImages, photoType) {
   const typeHint = photoType && photoType !== '-- Not selected / System inferred --'
     ? `Photo type: "${photoType}"\n\n`
     : ''
-  content.push({ type: 'text', text: `${typeHint}Influencer description: ${description}` })
+  const nichoHint = nicho ? `Content niche: ${nicho}\nInfluencer name: ${nombre || 'unknown'}\n\n` : ''
+  content.push({ type: 'text', text: `${typeHint}${nichoHint}Influencer description: ${description}` })
 
   const payload = JSON.stringify({
-    model: 'claude-sonnet-4-6',
+    model: ANTHROPIC_MODEL,
     max_tokens: 1500,
     system: AION_EXPERT_SYSTEM_PROMPT,
     messages: [{ role: 'user', content }],
@@ -594,25 +740,94 @@ function extractImages(outputs) {
 function readBody(req) {
   return new Promise((resolve, reject) => {
     let raw = ''
-    req.on('data', d => raw += d)
-    req.on('end', () => { try { resolve(JSON.parse(raw || '{}')) } catch { resolve({}) } })
+    let total = 0
+    req.on('data', d => {
+      total += d.length
+      if (total > MAX_JSON_BODY_BYTES) {
+        const err = new Error(`Body demasiado grande. Max ${(MAX_JSON_BODY_BYTES / 1024 / 1024).toFixed(0)}MB`)
+        err.statusCode = 413
+        req.destroy(err)
+        return
+      }
+      raw += d
+    })
+    req.on('end', () => {
+      try { resolve(JSON.parse(raw || '{}')) }
+      catch {
+        const err = new Error('JSON invalido')
+        err.statusCode = 400
+        reject(err)
+      }
+    })
     req.on('error', reject)
   })
 }
 
 function json(res, code, data) {
   const body = JSON.stringify(data)
-  res.writeHead(code, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' })
+  res.writeHead(code, { 'Content-Type': 'application/json' })
   res.end(body)
+}
+
+function fail(res, err) {
+  json(res, err.statusCode || 500, { error: err.message })
+}
+
+function decodeBase64Image(data, type) {
+  if (!ALLOWED_IMAGE_TYPES.has(type)) {
+    const err = new Error('Tipo de imagen no permitido. Usa JPEG, PNG o WebP.')
+    err.statusCode = 400
+    throw err
+  }
+  if (typeof data !== 'string' || !/^[A-Za-z0-9+/]+={0,2}$/.test(data) || data.length % 4 !== 0) {
+    const err = new Error('Imagen base64 invalida')
+    err.statusCode = 400
+    throw err
+  }
+  const buffer = Buffer.from(data, 'base64')
+  if (!buffer.length || buffer.length > MAX_UPLOAD_BYTES) {
+    const err = new Error(`Imagen demasiado grande. Max ${(MAX_UPLOAD_BYTES / 1024 / 1024).toFixed(0)}MB.`)
+    err.statusCode = 413
+    throw err
+  }
+  if (!looksLikeImage(buffer, type)) {
+    const err = new Error('El contenido no coincide con el tipo de imagen declarado')
+    err.statusCode = 400
+    throw err
+  }
+  return buffer
+}
+
+function looksLikeImage(buffer, type) {
+  if (type === 'image/jpeg') return buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff
+  if (type === 'image/png')  return buffer.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))
+  if (type === 'image/webp') return buffer.subarray(0, 4).toString('ascii') === 'RIFF' && buffer.subarray(8, 12).toString('ascii') === 'WEBP'
+  return false
+}
+
+function isAllowedOrigin(origin) {
+  return !origin || origin === `http://${HOST}:${PORT}`
 }
 
 const server = http.createServer(async (req, res) => {
   const parsed   = url.parse(req.url, true)
   const pathname = parsed.pathname
+  const origin   = req.headers.origin
 
   if (req.method === 'OPTIONS') {
-    res.writeHead(204, { 'Access-Control-Allow-Origin': '*', 'Access-Control-Allow-Headers': '*', 'Access-Control-Allow-Methods': '*' })
+    if (!isAllowedOrigin(origin)) {
+      res.writeHead(403)
+      res.end('Forbidden')
+      return
+    }
+    res.writeHead(204, { 'Access-Control-Allow-Origin': `http://${HOST}:${PORT}`, 'Access-Control-Allow-Headers': 'Content-Type', 'Access-Control-Allow-Methods': 'GET,POST,OPTIONS' })
     res.end()
+    return
+  }
+
+  if (!isAllowedOrigin(origin)) {
+    res.writeHead(403)
+    res.end('Forbidden')
     return
   }
 
@@ -641,8 +856,9 @@ const server = http.createServer(async (req, res) => {
       const { name, data, type } = body
       if (!name || !data) { json(res, 400, { error: 'name y data requeridos' }); return }
 
-      const buffer   = Buffer.from(data, 'base64')
-      const ext      = (type || 'image/jpeg').split('/')[1] || 'jpg'
+      const imageType = type || 'image/jpeg'
+      const buffer   = decodeBase64Image(data, imageType)
+      const ext      = IMAGE_EXTENSIONS[imageType]
       const filename = `refs/${Date.now()}-${name.replace(/[^a-z0-9]/gi, '_')}.${ext}`
 
       console.log(`\n[UPLOAD-IMAGE] name="${name}" size=${(buffer.length / 1024).toFixed(1)}KB`)
@@ -652,7 +868,7 @@ const server = http.createServer(async (req, res) => {
       json(res, 200, { url: imageUrl })
     } catch (err) {
       console.error('[UPLOAD-IMAGE ERROR]', err.message)
-      json(res, 500, { error: err.message })
+      fail(res, err)
     }
     return
   }
@@ -678,22 +894,36 @@ const server = http.createServer(async (req, res) => {
       }
 
       if (body.params) {
+        const bodyParamKeys = new Set(Object.keys(BODY_PARAM_OPTIONS))
         for (const [key, val] of Object.entries(body.params)) {
-          inputs[key] = val
+          if (!bodyParamKeys.has(key)) inputs[key] = val
         }
       }
 
+      const nombre          = (body.nombre || '').trim()
+      const nicho           = (body.nicho  || '').trim()
+      const hasBodyParams   = body.body_params && Object.keys(body.body_params).length > 0
+      const hasBodyDesc     = body.body_description && body.body_description.trim()
+
+      let promptBody = null
+      if ((hasBodyParams || hasBodyDesc) && ANTHROPIC_KEY) {
+        console.log(`\n[GENERATE-FACE] Generating prompt_body via Claude...`)
+        promptBody = await generateBodyPromptFromParams(nombre || 'influencer', nicho || 'lifestyle', body.body_params || {}, body.body_description || '')
+        console.log(`  prompt_body (${promptBody.length} chars): ${promptBody.slice(0, 100)}...`)
+      }
+      if (promptBody) inputs['prompt_body'] = promptBody
+
       const imgCount   = Object.keys(body.images  || {}).filter(k => (body.images  || {})[k]).length
       const paramCount = Object.keys(body.params  || {}).filter(k => { const v = (body.params || {})[k]; return v && v !== 'auto' && v !== '-- Not selected / System inferred --' }).length
-      console.log(`\n[GENERATE-FACE] photo_type="${inputs['photo_type']}" images=${imgCount} custom_params=${paramCount} prompt=${!!inputs['prompt']}`)
+      console.log(`\n[GENERATE-FACE] photo_type="${inputs['photo_type']}" images=${imgCount} custom_params=${paramCount} prompt=${!!inputs['prompt']} prompt_body=${!!promptBody}`)
 
       const runId = await startAionRun(inputs)
       console.log(`  run: ${runId}`)
 
-      json(res, 200, { runIds: [runId] })
+      json(res, 200, { runId, prompt_body: promptBody || null })
     } catch (err) {
       console.error('[GENERATE-FACE ERROR]', err.message)
-      json(res, 500, { error: err.message })
+      fail(res, err)
     }
     return
   }
@@ -705,50 +935,75 @@ const server = http.createServer(async (req, res) => {
       const description = (body.description || '').trim()
       const photoType   = (body.photo_type  || '-- Not selected / System inferred --').trim()
       const refImages   = body.reference_images || []
+      const nombre      = (body.nombre || '').trim()
+      const nicho       = (body.nicho  || '').trim()
 
       if (!description)   { json(res, 400, { error: 'description requerida' }); return }
       if (!ANTHROPIC_KEY) { json(res, 500, { error: 'Agrega ANTHROPIC_API_KEY en tu .env' }); return }
+      if (!Array.isArray(refImages) || refImages.filter(Boolean).length > 4) {
+        json(res, 400, { error: 'reference_images debe tener maximo 4 imagenes' }); return
+      }
+      for (const img of refImages.filter(Boolean)) {
+        decodeBase64Image(img.data, img.type)
+      }
 
-      console.log(`\n[CLAUDE-GUIDED] desc="${description.slice(0, 80)}..." refImages=${refImages.filter(Boolean).length} photoType="${photoType}"`)
+      console.log(`\n[CLAUDE-GUIDED] desc="${description.slice(0, 80)}..." refImages=${refImages.filter(Boolean).length} photoType="${photoType}" nicho="${nicho}"`)
 
-      const params = await generateAionParams(description, refImages, photoType)
-      console.log(`  Claude seleccionó ${Object.keys(params).length} params`)
-      console.log('  Selected params:', JSON.stringify(params, null, 2))
+      const allParams = await generateAionParams(description, refImages, photoType, nombre, nicho)
+      const { prompt_body: promptBody, ...faceParams } = allParams
+      console.log(`  Claude seleccionó ${Object.keys(faceParams).length} face params, prompt_body=${promptBody ? promptBody.length + ' chars' : 'none'}`)
+      console.log('  Selected face params:', JSON.stringify(faceParams, null, 2))
+      if (promptBody) console.log('  prompt_body:', promptBody.slice(0, 120) + '...')
 
       const inputs = {
         'photo_type':   photoType,
         'imagen final': 'Nano Banana Pro',
-        ...params,
+        ...faceParams,
       }
+      if (promptBody) inputs['prompt_body'] = promptBody
 
       const runId = await startAionRun(inputs)
       console.log(`  run: ${runId}`)
 
-      json(res, 200, { runId, selected_params: params })
+      json(res, 200, { runId, selected_params: faceParams, prompt_body: promptBody || null })
     } catch (err) {
       console.error('[CLAUDE-GUIDED ERROR]', err.message)
-      json(res, 500, { error: err.message })
+      fail(res, err)
     }
     return
   }
 
-  // POST /api/generate-body
+  // POST /api/generate-body — v2: { face_url, prompt_body } → GPT Image 2 via image_rostro
   if (req.method === 'POST' && pathname === '/api/generate-body') {
     try {
       const body       = await readBody(req)
+      const faceUrl    = (body.face_url    || '').trim()
+      const promptBody = (body.prompt_body || '').trim()
+
+      // v2 path: face_url + prompt_body → GPT Image 2 (same deployment c6e6b7f0)
+      if (faceUrl) {
+        if (!promptBody) { json(res, 400, { error: 'prompt_body requerido con face_url' }); return }
+        console.log(`\n[GENERATE-BODY-V2] face_url="${faceUrl.slice(0, 60)}..." prompt_body="${promptBody.slice(0, 60)}..."`)
+        const runId = await startBodyRunV2(faceUrl, promptBody)
+        console.log(`  run: ${runId}`)
+        json(res, 200, { runId })
+        return
+      }
+
+      // legacy path: { prompt, input_image } → deployment cabf22a3
       const prompt     = (body.prompt || '').trim()
       const inputImage = (body.input_image || '').trim()
-      if (!prompt)     { json(res, 400, { error: 'prompt requerido' }); return }
+      if (!prompt)     { json(res, 400, { error: 'face_url o prompt requerido' }); return }
       if (!inputImage) { json(res, 400, { error: 'input_image requerido' }); return }
 
-      console.log(`\n[GENERATE-BODY] prompt="${prompt.slice(0, 60)}..."`)
+      console.log(`\n[GENERATE-BODY-LEGACY] prompt="${prompt.slice(0, 60)}..."`)
       const runId = await startBodyRun(prompt, inputImage)
       console.log(`  run: ${runId}`)
 
       json(res, 200, { runIds: [runId] })
     } catch (err) {
       console.error('[GENERATE-BODY ERROR]', err.message)
-      json(res, 500, { error: err.message })
+      fail(res, err)
     }
     return
   }
@@ -772,7 +1027,7 @@ const server = http.createServer(async (req, res) => {
       json(res, 200, { prompt })
     } catch (err) {
       console.error('[BODY-PROMPT ERROR]', err.message)
-      json(res, 500, { error: err.message })
+      fail(res, err)
     }
     return
   }
@@ -797,7 +1052,7 @@ const server = http.createServer(async (req, res) => {
       json(res, 200, { persona })
     } catch (err) {
       console.error('[GENERATE-PERSONA ERROR]', err.message)
-      json(res, 500, { error: err.message })
+      fail(res, err)
     }
     return
   }
@@ -805,7 +1060,7 @@ const server = http.createServer(async (req, res) => {
   // GET /api/influencers
   if (req.method === 'GET' && pathname === '/api/influencers') {
     try { json(res, 200, loadInfluencers()) }
-    catch (err) { json(res, 500, { error: err.message }) }
+    catch (err) { fail(res, err) }
     return
   }
 
@@ -823,24 +1078,25 @@ const server = http.createServer(async (req, res) => {
       if (!nicho)   { json(res, 400, { error: 'nicho requerido' }); return }
       if (!faceUrl) { json(res, 400, { error: 'face_url requerido' }); return }
 
-      const data = loadInfluencers()
-      const influencer = {
-        id:         crypto.randomUUID(),
-        nombre,
-        nicho,
-        face_url:   faceUrl,
-        body_url:   bodyUrl,
-        persona,
-        created_at: new Date().toISOString(),
-        weeks:      [],
-      }
-      data.influencers.push(influencer)
-      saveInfluencers(data)
+      const influencer = await updateInfluencers(data => {
+        const item = {
+          id:         crypto.randomUUID(),
+          nombre,
+          nicho,
+          face_url:   faceUrl,
+          body_url:   bodyUrl,
+          persona,
+          created_at: new Date().toISOString(),
+          weeks:      [],
+        }
+        data.influencers.push(item)
+        return item
+      })
       console.log(`\n[INFLUENCER SAVED] "${nombre}" id=${influencer.id}`)
       json(res, 200, { influencer })
     } catch (err) {
       console.error('[INFLUENCER SAVE ERROR]', err.message)
-      json(res, 500, { error: err.message })
+      fail(res, err)
     }
     return
   }
@@ -853,24 +1109,28 @@ const server = http.createServer(async (req, res) => {
       const body = await readBody(req)
       const { theme, summary, plan } = body
 
-      const data = loadInfluencers()
-      const influencer = data.influencers.find(i => i.id === influencerId)
-      if (!influencer) { json(res, 404, { error: 'influencer no encontrada' }); return }
-
-      const week = {
-        week_id:      crypto.randomUUID(),
-        generated_at: new Date().toISOString(),
-        theme:        theme   || '',
-        summary:      summary || '',
-        plan:         plan    || null,
-      }
-      influencer.weeks.push(week)
-      saveInfluencers(data)
-      console.log(`\n[WEEK SAVED] influencer="${influencer.nombre}" theme="${theme}"`)
-      json(res, 200, { week_id: week.week_id, influencer_id: influencerId })
+      const result = await updateInfluencers(data => {
+        const influencer = data.influencers.find(i => i.id === influencerId)
+        if (!influencer) {
+          const err = new Error('influencer no encontrada')
+          err.statusCode = 404
+          throw err
+        }
+        const week = {
+          week_id:      crypto.randomUUID(),
+          generated_at: new Date().toISOString(),
+          theme:        theme   || '',
+          summary:      summary || '',
+          plan:         plan    || null,
+        }
+        influencer.weeks.push(week)
+        return { week, influencer }
+      })
+      console.log(`\n[WEEK SAVED] influencer="${result.influencer.nombre}" theme="${theme}"`)
+      json(res, 200, { week_id: result.week.week_id, influencer_id: influencerId })
     } catch (err) {
       console.error('[WEEK SAVE ERROR]', err.message)
-      json(res, 500, { error: err.message })
+      fail(res, err)
     }
     return
   }
@@ -898,7 +1158,7 @@ const server = http.createServer(async (req, res) => {
       json(res, 200, { plan })
     } catch (err) {
       console.error('[CONTENT-PLAN ERROR]', err.message)
-      json(res, 500, { error: err.message })
+      fail(res, err)
     }
     return
   }
@@ -913,7 +1173,9 @@ const server = http.createServer(async (req, res) => {
 
       if (!faceUrl)        { json(res, 400, { error: 'face_url requerido' }); return }
       if (!bodyUrl)        { json(res, 400, { error: 'body_url requerido' }); return }
-      if (!prompts.length) { json(res, 400, { error: 'prompts requerido' }); return }
+      if (!Array.isArray(prompts) || prompts.length !== 4 || prompts.some(p => typeof p !== 'string' || !p.trim())) {
+        json(res, 400, { error: 'prompts debe incluir exactamente 4 textos no vacios' }); return
+      }
 
       console.log(`\n[CONTENT-DAY] prompts=${prompts.length}`)
       const runId = await startContentDayRun(faceUrl, bodyUrl, prompts)
@@ -922,7 +1184,7 @@ const server = http.createServer(async (req, res) => {
       json(res, 200, { runIds: [runId] })
     } catch (err) {
       console.error('[CONTENT-DAY ERROR]', err.message)
-      json(res, 500, { error: err.message })
+      fail(res, err)
     }
     return
   }
@@ -939,8 +1201,14 @@ const server = http.createServer(async (req, res) => {
         console.log(`\n[STATUS] ${runId} -> success`)
         console.log('OUTPUTS:', JSON.stringify(data.outputs, null, 2))
         const images = extractImages(data.outputs)
-        console.log(`  images extracted: ${images.length}`)
-        json(res, 200, { status: 'success', images })
+        console.log(`  images extracted: ${images.length}`, images.map(u => u.split('/').pop()))
+        // Node 14 (AION) prefix "Nano Banana Pro" → URL-encoded as Nano%20Banana, NOT ComfyUI
+        // Node 651 (Gemini body) prefix "ComfyUI" → no special chars, safe to match with includes
+        const body_url = images.find(u => u.includes('ComfyUI')) || null
+        const face_url = images.find(u => !u.includes('ComfyUI')) || images[0] || null
+        console.log(`  face_url: ${face_url ? face_url.split('/').pop() : 'none'}`)
+        console.log(`  body_url: ${body_url ? body_url.split('/').pop() : 'none'}`)
+        json(res, 200, { status: 'success', images, face_url, body_url })
       } else if (['failed', 'cancelled', 'timeout'].includes(st)) {
         console.log(`[STATUS] ${runId} -> ${st}`)
         json(res, 200, { status: 'error', message: st })
@@ -949,13 +1217,22 @@ const server = http.createServer(async (req, res) => {
       }
     } catch (err) {
       console.error('[STATUS ERROR]', err.message)
-      json(res, 500, { error: err.message })
+      fail(res, err)
     }
     return
   }
 
   res.writeHead(404)
   res.end('Not found')
+})
+
+server.on('error', err => {
+  if (err.code === 'EADDRINUSE') {
+    console.error(`Puerto ${HOST}:${PORT} ocupado. Cierra el proceso que usa ese puerto y vuelve a ejecutar iniciar.bat.`)
+  } else {
+    console.error('Error del servidor:', err.message)
+  }
+  process.exit(1)
 })
 
 server.listen(PORT, HOST, () => {
@@ -967,6 +1244,7 @@ server.listen(PORT, HOST, () => {
     console.log(`   http://${HOST}:${PORT}`)
     console.log(`   ComfyDeploy: ${API_KEY ? API_KEY.slice(0, 8) + '...' : 'NO CONFIGURADA'}`)
     console.log(`   Anthropic:   ${ANTHROPIC_KEY ? ANTHROPIC_KEY.slice(0, 8) + '...' : 'NO CONFIGURADA'}`)
+    console.log(`   Modelo:      ${ANTHROPIC_MODEL}`)
     console.log(`   AION deploy: ${DEPLOYMENT_ID_AION}`)
     console.log(`   Content:     ${DEPLOYMENT_ID_CONTENT}`)
     console.log(`   Supabase:    ${SUPABASE_URL || 'NO CONFIGURADA'} / bucket: ${SUPABASE_BUCKET}`)

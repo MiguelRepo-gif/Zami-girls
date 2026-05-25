@@ -1,4 +1,4 @@
-# Zami AI Studio — Documentación Técnica v7 AION
+# Zami AI Studio — Documentación Técnica v8 AION + Gemini Body
 
 ## REGLA ABSOLUTA — COMANDOS SIEMPRE COMPLETOS
 
@@ -8,7 +8,7 @@ Cada vez que des un comando git, bat o node — SIEMPRE incluye el cd al inicio:
 
 ```
 cd C:\Users\LENOVO\zami-ai-studio-dev
-git pull origin main
+git pull --ff-only
 .\iniciar.bat
 ```
 
@@ -22,7 +22,7 @@ Cuando el usuario diga **"vamos a trabajar"**, **"iniciemos"**, **"empecemos"**,
 
 ```
 cd C:\Users\LENOVO\zami-ai-studio-dev
-git pull origin main
+git pull --ff-only
 .\iniciar.bat
 ```
 
@@ -47,19 +47,19 @@ El usuario configura el rostro manualmente vía AION (imágenes de referencia + 
 
 **Carpeta local:** `C:\Users\LENOVO\zami-ai-studio-dev`
 **Repositorio GitHub:** `https://github.com/Se7en198/zami-ai-studio-dev`
-**Rama activa:** `main`
+**Rama estable:** `main`
 
 **Sincronizar cambios:**
 ```
 cd C:\Users\LENOVO\zami-ai-studio-dev
-git pull origin main
+git pull --ff-only
 ```
 **Publicar cambios a GitHub:**
 ```
 cd C:\Users\LENOVO\zami-ai-studio-dev
 git add -p
 git commit -m "descripción del cambio"
-git push origin main
+git push origin HEAD
 ```
 
 ---
@@ -125,6 +125,8 @@ git push origin main
 El browser abre `http://127.0.0.1:3333` — siempre IPv4, nunca `localhost`.
 El servidor lee `.env` automáticamente al arrancar. No necesita `npm install`.
 
+**Smoke test seguro:** la UI y `/hero-photo.png` pueden probarse sin gastar APIs. Las rutas de generación, upload y contenido llaman servicios externos y requieren `.env` real.
+
 ### Ruta estática especial
 ```
 GET /hero-photo.png
@@ -133,9 +135,25 @@ GET /hero-photo.png
 ```
 Esta ruta fue agregada en v6 para evitar usar URLs externas de S3 como foto del hero.
 
-### Pipeline AION v7 — Fase 1: Generación de Rostro (dos modos)
+### Pipeline AION v8 — Fase 1: Generación Unificada Rostro + Cuerpo
 
-La UI tiene un tab switcher con **dos modos de creación de rostro**. Ambos comparten los campos tipo de foto (primero), nombre y nicho. El usuario elige el modo y hace clic en el botón principal. La UI muestra 4 pasos animados.
+Un solo run de ComfyDeploy genera **simultáneamente** el rostro (AION, nodo 66) y el cuerpo (GeminiImage2Node, nodo 655). El output del nodo AION se conecta directamente como input del nodo Gemini body — no hay segundo deployment ni segunda llamada.
+
+**Nodos clave del workflow:**
+- **Nodo 66** — `AionThetaNode`: genera el rostro
+- **Nodo 655** — `GeminiImage2Node`: genera el cuerpo usando la salida del nodo 66 como imagen de referencia
+- **Nodo 14** — `SaveImage` con prefijo `"Nano Banana Pro"`: guarda imagen del rostro
+- **Nodo 651** — `SaveImage` con prefijo `"ComfyUI"` (del nodo 652): guarda imagen del cuerpo
+- **Nodo 650** — input externo `prompt_body`: texto que controla qué cuerpo genera Gemini
+
+**Detección de face_url vs body_url en `/api/status`:**
+El prefijo `"Nano Banana Pro"` se URL-encoda como `Nano%20Banana%20Pro` en la URL S3, haciendo fallar regex. La detección correcta usa `includes('ComfyUI')` — ese prefijo no tiene espacios y nunca se encoda:
+```js
+const body_url = images.find(u => u.includes('ComfyUI')) || null
+const face_url = images.find(u => !u.includes('ComfyUI')) || images[0] || null
+```
+
+La UI tiene un tab switcher con **dos modos de creación**. Ambos comparten los campos tipo de foto (primero), nombre y nicho. La UI muestra 4 pasos animados.
 
 **Default de `photo_type` en UI:** `"Studio 2x2 portrait multi-view grid"` (preseleccionado desde v7)
 
@@ -144,37 +162,38 @@ La UI tiene un tab switcher con **dos modos de creación de rostro**. Ambos comp
 El usuario configura parámetros directamente y hace clic en **"Generar Rostro AION"**:
 
 ```
-PASO 1 — Generación de rostro con AION (Modo Manual)
+PASO 1 — Preparando parámetros (Modo Manual)
   Browser: POST /api/generate-face {
     photo_type,           ← siempre requerido
+    nombre, nicho,        ← para generar prompt_body
     images: {             ← solo si toggle A está ON (9 slots)
       eyes, eyebrows, nose, lips, forehead,
       jawline, hairline, skin, full_face
     },
-    params: {             ← solo si toggle B está ON
-      43 COMBO params de AION
+    params: {             ← solo si toggle B está ON (43 face params)
     },
+    body_params: {        ← solo si toggle B está ON y se seleccionaron body params (15 params)
+      body_type, height_build, bust_size, waist_definition, shoulder_width,
+      hip_width, glute_shape, waist_hip_ratio,
+      thigh_shape, leg_length, leg_shape, calf_shape,
+      body_skin_tone_match, body_skin_detail, body_skin_reflection
+    },
+    body_description: "", ← texto libre opcional para el cuerpo
     prompt: "..."         ← solo si toggle C está ON
   }
-  Server:  POST ComfyDeploy /api/run/deployment/queue
+  Server:  Si hay body_params o body_description → Claude genera prompt_body (BODY_EXPERT_SYSTEM_PROMPT, max_tokens 300)
+           POST ComfyDeploy /api/run/deployment/queue
            deployment_id: c6e6b7f0-e574-4aa8-9012-54e8507202e2
-           inputs: { photo_type, "imagen final": "Nano Banana Pro", ...images, ...params, prompt? }
-           ⚠️  "imagen final" es el prefijo del nombre del archivo de salida — siempre "Nano Banana Pro"
+           inputs: { photo_type, "imagen final": "Nano Banana Pro", ...face_params, prompt_body?, ...images, prompt? }
+           ⚠️  El mismo run incluye AION (rostro, nodo 66) + Gemini body (nodo 655) — salida directamente conectada
   Browser: polling GET /api/status/:runId cada 8s
-  Result:  URL de imagen de rostro → se muestra en pantalla
+  Result:  { face_url, body_url } — ambas identificadas por prefijo de filename
 
-PASO 2 — Prompt de cuerpo con Claude
-  Browser: POST /api/generate-body-prompt { nombre, nicho, face_description }
-           face_description = texto construido desde los inputs manuales del usuario
-  Server:  POST Anthropic /v1/messages — Claude genera prompt de cuerpo
-  Result:  prompt de texto para ComfyDeploy
+PASO 2 — Generando rostro y cuerpo
+  Browser: pollForBoth(runId) — polling hasta success (~2-5 min, timeout 10 min)
+  Result:  face_url y body_url mostradas simultáneamente en slots separados (Rostro | Cuerpo)
 
-PASO 3 — Generación de cuerpo
-  Browser: POST /api/generate-body { prompt, input_image: <url_rostro> }
-  Server:  POST ComfyDeploy /api/run/deployment/queue
-           deployment_id: cabf22a3-a697-485c-a6df-b6c09ee4f2f1
-  Browser: polling GET /api/status/:runId cada 8s
-  Result:  URL de imagen de cuerpo → se muestra en pantalla
+PASO 3 — Resultado listo (automático al completar paso 2)
 
 PASO 4 — Perfil AI Persona
   Browser: POST /api/generate-persona { nombre, nicho, face_url, body_url }
@@ -184,31 +203,37 @@ PASO 4 — Perfil AI Persona
 
 #### Modo B — Creación con Claude (tab "✦ Crear con Claude")
 
-El usuario escribe una descripción en lenguaje natural y opcionalmente adjunta imágenes de referencia para Claude (hasta 4). Claude analiza todo, selecciona los 43 parámetros AION óptimos y dispara la generación automáticamente. El botón muestra **"✦ Generar con Claude"**.
+El usuario escribe una descripción en lenguaje natural y opcionalmente adjunta imágenes de referencia para Claude (hasta 4). Claude analiza todo, selecciona los 43 parámetros AION + genera el `prompt_body` del cuerpo en un solo JSON, y dispara la generación automáticamente. El botón muestra **"✦ Generar con Claude"**.
 
 ```
-PASO 1 — Claude elige params → AION genera rostro
+PASO 1 — Claude elige params de rostro + genera prompt_body
   Browser: POST /api/claude-guided-face {
     description: "mujer francesa, labios carnosos, ojos azules...",
     photo_type:  "Studio 2x2 portrait multi-view grid",
+    nombre, nicho,
     reference_images: [           ← opcional, hasta 4 imágenes
       { type: "image/jpeg", data: "<base64>" }
     ]
   }
   Server:  POST Anthropic /v1/messages
-           system: AION_EXPERT_SYSTEM_PROMPT (experto en los 43 params)
-           content: [ ...imágenes base64..., descripción del usuario ]
-           Claude devuelve JSON puro con los 43 params seleccionados
+           system: AION_EXPERT_SYSTEM_PROMPT (experto en 43 face params + prompt_body)
+           content: [ ...imágenes base64..., nicho, descripción ]
+           Claude devuelve JSON con 43 face params + "prompt_body" (44 campos total)
+           Destructuring: const { prompt_body: promptBody, ...faceParams } = allParams
   Server:  POST ComfyDeploy /api/run/deployment/queue
            deployment_id: c6e6b7f0-e574-4aa8-9012-54e8507202e2
-           inputs: { photo_type, "imagen final": "Nano Banana Pro", ...params_de_claude }
-  Server:  devuelve { runId, selected_params }
-  Browser: muestra resumen de params elegidos por Claude
-  Browser: polling GET /api/status/:runId cada 8s
-  Result:  URL de imagen de rostro → se muestra en pantalla
+           inputs: { photo_type, "imagen final": "Nano Banana Pro", ...faceParams, prompt_body }
+  Server:  devuelve { runId, selected_params: faceParams, prompt_body: promptBody }
+  Browser: renderClaudeParamsSummary(selected_params, prompt_body)
+           — muestra grid de params + sección "Body prompt:" con texto completo
 
-PASOS 2, 3, 4 — idénticos al Modo Manual
-  La descripción del usuario se pasa como face_description al body-prompt.
+PASO 2 — Generando rostro y cuerpo (polling run único)
+  Browser: pollForBoth(r1.runId, 2) cada 8s
+  Result:  face_url + body_url → ambas mostradas al completar
+
+PASO 3 — Resultado listo (automático)
+
+PASO 4 — Perfil AI Persona (igual al Modo Manual)
 ```
 
 **Diferencia clave de las imágenes de referencia en Modo B:**
@@ -218,11 +243,32 @@ PASOS 2, 3, 4 — idénticos al Modo Manual
 - Son distintas a las imágenes de referencia del Toggle A (Modo Manual)
 
 **AION_EXPERT_SYSTEM_PROMPT** — hardcodeado en `server.cjs`, contiene:
-- Los 43 params con sus opciones exactas extraídas del workflow JSON
-- Instrucciones para optimizar belleza máxima y realismo fotográfico
+- Los 43 face params con sus opciones exactas
+- Las instrucciones para generar `prompt_body` como **campo 44** del JSON de respuesta
+- El nicho se pasa en el mensaje del usuario para que Claude infiera el cuerpo apropiado
 - Regla: defects group siempre "none" salvo que el usuario pida lo contrario
 - Regla: nunca usar "auto" — siempre elegir el mejor valor disponible
-- Output: JSON puro, sin markdown, sin explicación
+- Output: JSON con 44 campos. Ejemplo: `{"sex":"female","ethnicity":"Latin American",...,"prompt_body":"A photorealistic full-body portrait..."}`
+
+**BODY_EXPERT_SYSTEM_PROMPT** — hardcodeado en `server.cjs`, para Modo Manual:
+- Recibe los 15 body params + nicho + nombre
+- Genera un prompt en inglés de **120–150 palabras** para el nodo `GeminiImage2Node`
+- Fondo blanco puro (#FFFFFF), iluminación high-key sin sombras, plano completo head-to-toe
+- Outfit: bodysuit blanco o swimwear nude — solo para revelar proporciones, sin accesorios ni patrones
+- NO describe cara, NO escena, NO contexto — solo proporciones corporales anatómicas
+- Usado en `/api/generate-face` cuando hay `body_params` o `body_description` en el request
+- `max_tokens: 300`
+- Output: texto plano sin markdown, sin etiquetas, sin explicación
+
+### Función `generateBodyPromptFromParams(nombre, nicho, bodyParams, bodyDescription)`
+
+```js
+// En server.cjs
+// Llama a Claude con BODY_EXPERT_SYSTEM_PROMPT
+// Retorna: string (el prompt_body en inglés, 120-150 palabras)
+// max_tokens: 300
+// Modelo: ANTHROPIC_MODEL (claude-sonnet-4-6)
+```
 
 ### Upload de imágenes de referencia (Toggle A — Modo Manual)
 
@@ -269,13 +315,14 @@ FASE 4 — Contenido Semanal (se repite cada semana por cada influencer)
 
 ## AION — PARÁMETROS Y MODOS
 
-### Workflow deployment AION
+### Workflow deployment AION + Gemini Body (run unificado)
 - **Deployment ID:** `c6e6b7f0-e574-4aa8-9012-54e8507202e2`
-- **Input `imagen final`:** siempre hardcodeado como `"Nano Banana Pro"` (prefijo del archivo de output SaveImage)
+- **Input `imagen final`:** siempre hardcodeado como `"Nano Banana Pro"` (prefijo del archivo de output SaveImage nodo 14)
 - **Input `photo_type`:** siempre enviado; UI default desde v7: `"Studio 2x2 portrait multi-view grid"`
+- **Input `prompt_body`:** texto para el nodo `GeminiImage2Node` (nodo 650 external input) — opcional, si se omite Gemini usa defaults internos
 
-### Arquitectura del workflow (v4 ExternalImage)
-El workflow usa nodos `ExternalImage (ComfyUI Deploy)` conectados directamente al `AionThetaNode`. No hay `LoadImage` hardcodeados ni `Fast Groups Muter` para control de API. AION detecta internamente qué inputs recibió y activa el modo correspondiente.
+### Arquitectura del workflow (v4 ExternalImage + Gemini body)
+El workflow usa nodos `ExternalImage (ComfyUI Deploy)` conectados directamente al `AionThetaNode` (nodo 66). La **salida del nodo 66** se conecta directamente como input de imagen al `GeminiImage2Node` (nodo 655) — no hay segundo deployment. Los dos `SaveImage` (nodos 14 y 651) guardan el rostro y el cuerpo respectivamente con prefijos distintos.
 
 ### Modos del nodo AION
 - **auto_detect** — cuando se proveen imágenes de referencia (Toggle A ON)
@@ -289,9 +336,24 @@ eyes, eyebrows, nose, lips, forehead, jawline, hairline, skin, full_face
 ```
 Cada imagen se sube a Supabase antes de enviarse a ComfyDeploy.
 
-### Toggle B — 43 COMBO params
-Grupos: Demographics, Eyes, Eyebrows, Nose, Lips, Structure, Volumes, Hair, Skin, Defects, Expression.
-Se incluyen en el payload solo si el toggle B está ON. Si OFF, las keys se omiten (AION usa defaults internos).
+### Toggle B — 43 COMBO params (rostro) + 15 body params (cuerpo)
+
+**Face params (43):** Grupos Demographics, Eyes, Eyebrows, Nose, Lips, Structure, Volumes, Hair, Skin, Defects, Expression.
+IDs en UI: `param-{name}` (ej: `param-sex`, `param-ethnicity`).
+Se incluyen en el payload solo si el toggle B está ON. Si OFF, las keys se omiten.
+
+**Body params (15) — `BODY_PARAM_OPTIONS` en `server.cjs`:**
+
+| Grupo | Param | IDs en UI |
+|---|---|---|
+| Figura | `body_type`, `height_build` | `bodyparam-body_type`, `bodyparam-height_build` |
+| Busto / Cintura | `bust_size`, `waist_definition`, `shoulder_width` | `bodyparam-bust_size`, etc. |
+| Caderas / Glúteos | `hip_width`, `glute_shape`, `waist_hip_ratio` | `bodyparam-hip_width`, etc. |
+| Piernas | `thigh_shape`, `leg_length`, `leg_shape`, `calf_shape` | `bodyparam-thigh_shape`, etc. |
+| Piel corporal | `body_skin_tone_match`, `body_skin_detail`, `body_skin_reflection` | `bodyparam-body_skin_tone_match`, etc. |
+
+Opciones default: `"auto"` — si el valor es `"auto"`, se excluye del payload (no se envía al servidor).
+Seleccionar uno o más body params → el servidor llama `generateBodyPromptFromParams()` → `prompt_body` va al run.
 
 ### Toggle C — Prompt libre
 Texto libre que describe el rostro. Se incluye solo si toggle C está ON y hay texto escrito.
@@ -300,7 +362,7 @@ Texto libre que describe el rostro. Se incluye solo si toggle C está ON y hay t
 
 ## API CALLS — FORMATO EXACTO
 
-### ComfyDeploy — AION Face Generation
+### ComfyDeploy — AION + Gemini Body (run unificado)
 ```
 POST https://api.comfydeploy.com/api/run/deployment/queue
 Authorization: Bearer {VITE_COMFYDEPLOY_API_KEY}
@@ -311,7 +373,9 @@ Content-Type: application/json
   "inputs": {
     "photo_type": "Studio 2x2 portrait multi-view grid",
     "imagen final": "Nano Banana Pro",
-    "prompt": "...",              ← solo si toggle C ON
+    "prompt_body": "...",          ← si hay body_params o body_description (Modo Manual)
+                                     o si Claude lo generó (Modo Claude)
+    "prompt": "...",              ← solo si toggle C ON (Modo Manual)
     "eyes": "https://...",        ← solo si toggle A ON y slot tiene imagen
     "eyebrows": "https://...",
     "nose": "https://...",
@@ -321,12 +385,31 @@ Content-Type: application/json
     "hairline": "https://...",
     "skin": "https://...",
     "full_face": "https://...",
-    "sex": "female",              ← solo si toggle B ON
+    "sex": "female",              ← solo si toggle B ON (face params)
     "ethnicity": "...",
-    ... (hasta 43 COMBO params)
+    ... (hasta 43 COMBO face params)
   }
 }
 → { "run_id": "xxx" }
+```
+
+### ComfyDeploy — Polling y detección de imágenes
+```
+GET https://api.comfydeploy.com/api/run/{run_id}
+→ { "status": "queued|running|started|uploading|success|failed|cancelled|timeout",
+    "outputs": [...] }
+
+Cuando status === "success":
+  images = extractImages(data.outputs)   ← extrae todas las URLs de imagen
+  body_url = images.find(u => u.includes('ComfyUI'))     ← prefijo nodo 651
+  face_url = images.find(u => !u.includes('ComfyUI'))    ← prefijo nodo 14 (Nano Banana)
+  Respuesta: { status: 'success', images, face_url, body_url }
+
+⚠️ NO usar regex /nano.banana/i — el prefijo "Nano Banana Pro" se URL-encoda como Nano%20Banana
+   Usar includes('ComfyUI') que nunca se encoda.
+
+Estados terminales: success, failed, cancelled, timeout
+Polling cada 8 segundos.
 ```
 
 ### Supabase Storage — Upload imagen
@@ -343,47 +426,22 @@ Public URL: https://vtyuylgfjvleywupbdzl.supabase.co/storage/v1/object/public/za
 
 **Bucket:** `zami-images` — público, policy `FOR ALL TO anon`.
 
-### Anthropic — Claude-guided face (selección de params AION)
+### Anthropic — Claude-guided face (selección de params AION + prompt_body)
 ```
 POST https://api.anthropic.com/v1/messages
 { "model": "claude-sonnet-4-6", "max_tokens": 1500,
   "system": "<AION_EXPERT_SYSTEM_PROMPT>",
   "messages": [{ "role": "user", "content": [ ...reference_images_base64..., { "type": "text", "text": description } ] }] }
-→ JSON puro con los 43 params
+→ JSON puro con 44 campos: 43 face params + "prompt_body"
 ```
 
-### Anthropic — Body Prompt
+### Anthropic — Body Prompt (Modo Manual con body_params)
 ```
 POST https://api.anthropic.com/v1/messages
-{ "model": "claude-sonnet-4-6", "max_tokens": 500,
-  "messages": [{ "role": "user", "content": "<instrucción con face_description>" }] }
-```
-
-### ComfyDeploy — Cuerpo
-```
-{ "deployment_id": "cabf22a3-a697-485c-a6df-b6c09ee4f2f1",
-  "inputs": { "input_image": "<url_rostro>", "prompt": "...", "filename_prefix": "ComfyUI" } }
-```
-
-### ComfyDeploy — Fase 4 UGC
-```
-{ "deployment_id": "8d4702cb-c504-4bf2-8284-ee17d6e66633",
-  "inputs": {
-    "prompt 1": "...", "input_image 1": "<face>", "input_image 2": "<body>", "filename_prefix 1": "ComfyUI",
-    "prompt 2": "...", "input_image 3": "<face>", "input_image 4": "<body>", "filename_prefix 2": "ComfyUI",
-    "prompt 3": "...", "input_image 5": "<face>", "input_image 6": "<body>", "filename_prefix 3": "ComfyUI",
-    "prompt 4": "...", "input_image 7": "<face>", "input_image 8": "<body>", "filename_prefix 4": "ComfyUI"
-  } }
-```
-
-### ComfyDeploy — Polling
-```
-GET https://api.comfydeploy.com/api/run/{run_id}
-→ { "status": "queued|running|started|uploading|success|failed|cancelled|timeout",
-    "outputs": [{ "data": { [nodeKey]: [{ "url": "https://...", "type": "image/png" }] } }] }
-
-Estados terminales: success, failed, cancelled, timeout
-Polling cada 8 segundos.
+{ "model": "claude-sonnet-4-6", "max_tokens": 300,
+  "system": "<BODY_EXPERT_SYSTEM_PROMPT>",
+  "messages": [{ "role": "user", "content": "<nombre, nicho, body_params seleccionados>" }] }
+→ Texto plano: prompt de 120–150 palabras para GeminiImage2Node
 ```
 
 ### Anthropic — AI Persona
@@ -409,6 +467,17 @@ POST https://api.anthropic.com/v1/messages
 → JSON: { theme, summary, week[5] } — cada día: scene, caption, hashtags, variations[4]
 ```
 
+### ComfyDeploy — Fase 4 UGC
+```
+{ "deployment_id": "8d4702cb-c504-4bf2-8284-ee17d6e66633",
+  "inputs": {
+    "prompt 1": "...", "input_image 1": "<face>", "input_image 2": "<body>", "filename_prefix 1": "ComfyUI",
+    "prompt 2": "...", "input_image 3": "<face>", "input_image 4": "<body>", "filename_prefix 2": "ComfyUI",
+    "prompt 3": "...", "input_image 5": "<face>", "input_image 6": "<body>", "filename_prefix 3": "ComfyUI",
+    "prompt 4": "...", "input_image 7": "<face>", "input_image 8": "<body>", "filename_prefix 4": "ComfyUI"
+  } }
+```
+
 ---
 
 ## ENDPOINTS DEL SERVIDOR LOCAL
@@ -418,12 +487,12 @@ POST https://api.anthropic.com/v1/messages
 | `GET` | `/` | — | Sirve server-ui.html |
 | `GET` | `/hero-photo.png` | — | Sirve `Foto inicio/Nano Banana Pro_00001_.png` (hero fija) |
 | `POST` | `/api/upload-image` | `{ name, data: base64, type }` | Sube imagen a Supabase Storage → `{ url }` |
-| `POST` | `/api/generate-face` | `{ photo_type, images?, params?, prompt? }` | AION face generation — Modo Manual |
-| `POST` | `/api/claude-guided-face` | `{ description, photo_type, reference_images? }` | Claude elige params → AION genera rostro — Modo Claude |
-| `POST` | `/api/generate-body-prompt` | `{ nombre, nicho, face_description }` | Claude genera prompt de cuerpo |
-| `POST` | `/api/generate-body` | `{ prompt, input_image }` | Genera cuerpo en ComfyDeploy |
+| `POST` | `/api/generate-face` | `{ photo_type, nombre, nicho, images?, params?, body_params?, body_description?, prompt? }` | AION + Gemini body — Modo Manual → `{ runId, prompt_body }` |
+| `POST` | `/api/claude-guided-face` | `{ description, photo_type, nombre, nicho, reference_images? }` | Claude elige 44 params → AION + Gemini body — Modo Claude → `{ runId, selected_params, prompt_body }` |
+| `POST` | `/api/generate-body-prompt` | `{ nombre, nicho, face_description }` | Claude genera prompt de cuerpo (legacy, no usado en flujo principal) |
+| `POST` | `/api/generate-body` | `{ prompt, input_image }` | Genera cuerpo en ComfyDeploy (legacy, no usado en flujo principal) |
 | `POST` | `/api/generate-persona` | `{ nombre, nicho, face_url, body_url }` | Claude genera AI Persona |
-| `GET` | `/api/status/:runId` | — | Polling estado ComfyDeploy |
+| `GET` | `/api/status/:runId` | — | Polling ComfyDeploy → `{ status, images, face_url, body_url }` |
 | `GET` | `/api/influencers` | — | Lista influencers guardadas |
 | `POST` | `/api/influencers` | `{ nombre, nicho, face_url, body_url, persona }` | Guarda influencer |
 | `POST` | `/api/influencers/:id/weeks` | `{ theme, summary, plan }` | Guarda semana |
@@ -437,7 +506,7 @@ POST https://api.anthropic.com/v1/messages
 | Archivo | Función |
 |---|---|
 | `server.cjs` | Servidor local — pipeline completo + ruta `/hero-photo.png` |
-| `server-ui.html` | UI completa — hero, studio, 3 toggles, 43 params, Fase 4 |
+| `server-ui.html` | UI completa — hero, studio, 3 toggles, 43 face params + 15 body params, Fase 4 |
 | `iniciar.bat` | Lanzador Windows (taskkill + node server.cjs) |
 | `.env` | Variables de entorno (NO commitear) |
 | `.env.example` | Template de variables |
@@ -455,8 +524,8 @@ VITE_COMFYDEPLOY_API_KEY=
 ANTHROPIC_API_KEY=
 
 # DEPLOYMENT IDs activos
-VITE_COMFYDEPLOY_AION_DEPLOYMENT_ID=c6e6b7f0-e574-4aa8-9012-54e8507202e2
-VITE_COMFYDEPLOY_BODY_DEPLOYMENT_ID=cabf22a3-a697-485c-a6df-b6c09ee4f2f1  # leída con fallback hardcodeado en server.cjs
+VITE_COMFYDEPLOY_AION_DEPLOYMENT_ID=c6e6b7f0-e574-4aa8-9012-54e8507202e2   # AION rostro + Gemini cuerpo (run unificado)
+VITE_COMFYDEPLOY_BODY_DEPLOYMENT_ID=cabf22a3-a697-485c-a6df-b6c09ee4f2f1   # legacy, no usado en flujo principal
 VITE_COMFYDEPLOY_CONTENT_DEPLOYMENT_ID=8d4702cb-c504-4bf2-8284-ee17d6e66633
 
 # Supabase Storage
@@ -475,10 +544,10 @@ VITE_FAL_API_KEY=
 
 | Fase | Nombre | Motor | Estado |
 |---|---|---|---|
-| 1a | Generación de Rostro — Modo Manual | ComfyDeploy `c6e6b7f0` | ✅ Operativo |
-| 1b | Generación de Rostro — Modo Claude | Anthropic `claude-sonnet-4-6` + ComfyDeploy `c6e6b7f0` | ✅ Operativo |
-| 2 | Prompt de Cuerpo | Anthropic `claude-sonnet-4-6` | ✅ Operativo |
-| 3 | Generación de Cuerpo | ComfyDeploy `cabf22a3` | ✅ Operativo |
+| 1a | Generación Rostro + Cuerpo — Modo Manual | ComfyDeploy `c6e6b7f0` (AION nodo 66 + Gemini nodo 655) | ✅ Operativo |
+| 1b | Generación Rostro + Cuerpo — Modo Claude | Anthropic `claude-sonnet-4-6` + ComfyDeploy `c6e6b7f0` | ✅ Operativo |
+| 2 | Prompt de Cuerpo (Modo Manual) | Anthropic `claude-sonnet-4-6` (`BODY_EXPERT_SYSTEM_PROMPT`) | ✅ Operativo |
+| 3 | Generación de Cuerpo | Integrado en `c6e6b7f0` (Gemini body nodo 655) | ✅ Operativo |
 | 4 | Perfil AI Persona | Anthropic `claude-sonnet-4-6` | ✅ Operativo |
 | Fase 4 | Contenido UGC Semanal | Claude + ComfyDeploy `8d4702cb` | ✅ Operativo |
 | Fase 5 | Publicación | Por definir | ⏳ Pendiente |
@@ -537,20 +606,26 @@ ONE photograph. Portrait orientation. Instagram-ready. Sexy, real, aspirational.
 
 ## DECISIONES TÉCNICAS IMPORTANTES
 
+- **Run unificado rostro + cuerpo** — deployment `c6e6b7f0` incluye AION (nodo 66) + GeminiImage2Node (nodo 655) en el mismo run. La salida de AION se conecta internamente como referencia de Gemini. No hay segundo deployment.
+- **URL detection por prefijo** — `"ComfyUI"` (nodo 651, cuerpo) no tiene espacios, nunca se URL-encoda. `"Nano Banana Pro"` (nodo 14, rostro) se encoda como `Nano%20Banana%20Pro`. La detección usa `includes('ComfyUI')` — nunca regex sobre el prefijo del rostro.
+- **15 body params opcionales** — se recolectan de `bodyparam-{name}` selects en Toggle B. Si el valor es `"auto"`, se excluye del payload. Si hay al menos uno seleccionado, el servidor llama `generateBodyPromptFromParams()` para generar `prompt_body`.
+- **BODY_EXPERT_SYSTEM_PROMPT** — enfocado en fondo blanco puro, plano completo head-to-toe, solo proporciones anatómicas. 120–150 palabras. El outfit es bodysuit blanco o swimwear nude — solo para revelar el cuerpo.
+- **AION_EXPERT_SYSTEM_PROMPT devuelve 44 campos** — 43 face params + `prompt_body` (campo 44). El nicho infiere el tipo de cuerpo apropiado (fitness=atlético, gamer=curvy soft, fashion=hourglass).
 - **Dos modos de Fase 1** — Manual (3 toggles) y Claude-guided (descripción natural + imágenes para Claude).
-- **Modo Claude: images solo para Anthropic** — Las imágenes de referencia del modo Claude van en base64 directo a la API de Anthropic, NO a Supabase ni a AION. Son para análisis de rasgos, no para inyección al workflow.
+- **Modo Claude: images solo para Anthropic** — Las imágenes de referencia del modo Claude van en base64 directo a la API de Anthropic, NO a Supabase ni a AION.
 - **ExternalImage nodes directos** — el workflow AION v4 conecta `ExternalImage` directo al `AionThetaNode`. Sin `LoadImage` hardcodeados. Input `None` = AION lo ignora.
 - **Toggle = omit** — cuando un toggle está OFF, esas keys se omiten del payload completamente.
 - **Upload Supabase antes de ComfyDeploy** — imágenes de referencia van a Supabase primero, luego URL pública a ComfyDeploy.
 - **`imagen final` hardcodeado** — siempre `"Nano Banana Pro"`.
 - **9 image slots** — `eyes, eyebrows, nose, lips, forehead, jawline, hairline, skin, full_face`.
 - **`iniciar.bat` hace `taskkill`** — mata proceso Node previo antes de arrancar.
-- **Polling cada 8 segundos** — ComfyDeploy tarda 1–5 minutos.
+- **Polling cada 8 segundos, timeout 10 min** — `pollForBoth()` en la UI.
 - **Fase 4: 1 run = 4 imágenes** — 5 runs en paralelo = 20 imágenes totales.
 - **No necesita npm install** — `server.cjs` usa solo módulos nativos de Node.js.
 - **Hero photo local** — `/hero-photo.png` se sirve desde `Foto inicio/Nano Banana Pro_00001_.png`. Si la carpeta o el archivo no existe, el endpoint devuelve 404 y el hero muestra el placeholder.
 - **Lime sobre negro** — todos los botones con fondo `#C8FF00` deben tener `color: #000` explícito. Nunca `color: #fff` sobre lime.
-- **CSS cascade limpia** — cada selector tiene UNA sola regla definitiva. No duplicar `.mode-tab`, `.btn-nueva`, `label` etc. La especificidad `#influencers-panel .btn-nueva` se usa para separar el botón sidebar del posible botón panel antiguo.
+- **CSS cascade limpia** — cada selector tiene UNA sola regla definitiva. No duplicar `.mode-tab`, `.btn-nueva`, `label` etc.
+- **`/api/generate-body` y `/api/generate-body-prompt` son legacy** — siguen en el servidor como fallback pero no se llaman desde el flujo principal.
 
 ---
 
@@ -558,7 +633,11 @@ ONE photograph. Portrait orientation. Instagram-ready. Sexy, real, aspirational.
 
 **Error "Not found" en rutas:** El proceso node viejo sigue corriendo. Correr `.\iniciar.bat` de nuevo.
 
-**La imagen de rostro no aparece tras `success`:** Revisar terminal — buscar `OUTPUTS:`.
+**Ambas imágenes muestran el cuerpo (no rostro y cuerpo):** La detección face/body usa `includes('ComfyUI')`. Verificar que el `SaveImage` del rostro usa prefijo `"Nano Banana Pro"` y el del cuerpo usa `"ComfyUI"`. Si el workflow cambia esos prefijos, actualizar la lógica en `/api/status/:runId`.
+
+**La imagen de rostro no aparece tras `success`:** Revisar terminal — buscar `OUTPUTS:` y `face_url:` en los logs.
+
+**Body url es null aunque el run tuvo éxito:** Puede que el workflow no esté generando la segunda imagen. Verificar que `prompt_body` llegó al run (buscar en logs `prompt_body` antes del `startAionRun`).
 
 **Hero muestra placeholder en lugar de la modelo:**
 - Verificar que existe `Foto inicio/Nano Banana Pro_00001_.png`
@@ -576,4 +655,4 @@ ONE photograph. Portrait orientation. Instagram-ready. Sexy, real, aspirational.
 
 **Regla PowerShell:** Siempre `.\iniciar.bat` con `.\` — sin el punto barra falla.
 
-**Botones con texto blanco sobre lime:** Si algún botón nuevo tiene fondo `#C8FF00` y texto blanco, agregar `color: #000` explícito al selector CSS. Nunca confiar en herencia para esto.
+**Botones con texto blanco sobre lime:** Si algún botón nuevo tiene fondo `#C8FF00` y texto blanco, agregar `color: #000` explícito al selector CSS.
