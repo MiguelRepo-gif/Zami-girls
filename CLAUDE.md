@@ -343,6 +343,15 @@ Public URL: https://vtyuylgfjvleywupbdzl.supabase.co/storage/v1/object/public/za
 
 **Bucket:** `zami-images` — público, policy `FOR ALL TO anon`.
 
+### Anthropic — Claude-guided face (selección de params AION)
+```
+POST https://api.anthropic.com/v1/messages
+{ "model": "claude-sonnet-4-6", "max_tokens": 1500,
+  "system": "<AION_EXPERT_SYSTEM_PROMPT>",
+  "messages": [{ "role": "user", "content": [ ...reference_images_base64..., { "type": "text", "text": description } ] }] }
+→ JSON puro con los 43 params
+```
+
 ### Anthropic — Body Prompt
 ```
 POST https://api.anthropic.com/v1/messages
@@ -447,7 +456,7 @@ ANTHROPIC_API_KEY=
 
 # DEPLOYMENT IDs activos
 VITE_COMFYDEPLOY_AION_DEPLOYMENT_ID=c6e6b7f0-e574-4aa8-9012-54e8507202e2
-VITE_COMFYDEPLOY_BODY_DEPLOYMENT_ID=cabf22a3-a697-485c-a6df-b6c09ee4f2f1
+VITE_COMFYDEPLOY_BODY_DEPLOYMENT_ID=cabf22a3-a697-485c-a6df-b6c09ee4f2f1  # leída con fallback hardcodeado en server.cjs
 VITE_COMFYDEPLOY_CONTENT_DEPLOYMENT_ID=8d4702cb-c504-4bf2-8284-ee17d6e66633
 
 # Supabase Storage

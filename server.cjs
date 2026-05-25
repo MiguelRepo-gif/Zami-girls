@@ -21,7 +21,7 @@ loadEnv()
 const API_KEY               = process.env.VITE_COMFYDEPLOY_API_KEY || ''
 const ANTHROPIC_KEY         = process.env.ANTHROPIC_API_KEY || ''
 const DEPLOYMENT_ID_AION    = process.env.VITE_COMFYDEPLOY_AION_DEPLOYMENT_ID || 'c6e6b7f0-e574-4aa8-9012-54e8507202e2'
-const DEPLOYMENT_ID_BODY    = 'cabf22a3-a697-485c-a6df-b6c09ee4f2f1'
+const DEPLOYMENT_ID_BODY    = process.env.VITE_COMFYDEPLOY_BODY_DEPLOYMENT_ID || 'cabf22a3-a697-485c-a6df-b6c09ee4f2f1'
 const DEPLOYMENT_ID_CONTENT = process.env.VITE_COMFYDEPLOY_CONTENT_DEPLOYMENT_ID || '8d4702cb-c504-4bf2-8284-ee17d6e66633'
 const SUPABASE_URL          = process.env.VITE_SUPABASE_URL || ''
 const SUPABASE_KEY          = process.env.VITE_SUPABASE_ANON_KEY || ''
