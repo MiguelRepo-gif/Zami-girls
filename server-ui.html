@@ -897,7 +897,7 @@
   <div id="content-calendar-wrap" style="display:none">
     <div class="calendar-grid" id="content-calendar"></div>
     <button class="btn-generate-week" id="btn-generate-week" onclick="generateWeekImages()" style="display:none">
-      Generar Semana Completa — 20 Imágenes (5 días × 4 variaciones)
+      Generar 8 Imágenes
     </button>
     <button class="btn-save-week" id="btn-save-week" onclick="saveWeek()" style="display:none">
       Guardar semana en historial
@@ -1643,7 +1643,7 @@ async function pollForBoth(runId, stepNum) {
       if (data.status === 'error') throw new Error(data.message || 'ComfyDeploy error')
       setStep(stepNum, 'active', `Generando rostro y cuerpo... ${Math.round(elapsed / 1000)}s`)
     } catch (err) {
-      if (err.message.includes('ComfyDeploy') || err.message.includes('no devolvio')) throw err
+      if (err.message.includes('ComfyDeploy') || err.message.includes('no devolvio') || ['failed','cancelled','timeout'].includes(err.message)) throw err
       console.warn('poll error:', err.message)
     }
   }
@@ -1842,37 +1842,36 @@ function renderCalendar(plan) {
   cal.scrollIntoView({ behavior: 'smooth', block: 'start' })
 }
 
-function makeDayCard(dayData) {
+function makeDayCard(slotData) {
+  const formatBg = { '9:16': '#7c3aed', '4:5': '#C8FF00', '3:4': '#d97706', '1:1': '#0ea5e9' }
+  const formatColor = slotData.format === '4:5' ? '#000' : '#fff'
+  const bg = formatBg[slotData.format] || '#444'
+
   const el = document.createElement('div')
   el.className = 'day-card'
-  el.dataset.dayIndex = dayData.dayIndex
-
-  let variationsHtml = ''
-  for (const v of (dayData.variations || [])) {
-    const slotId = `slot-d${dayData.dayIndex}-v${v.varIndex}`
-    variationsHtml += `
-      <div class="variation-item">
-        <div class="variation-header">
-          <span class="shot-type-tag">${escHtml(v.shotType || '')}</span>
-          <span style="font-size:0.65rem;color:#444;margin-left:auto">Var. ${v.varIndex + 1}</span>
-        </div>
-        <div class="variation-prompt" contenteditable="true"
-             id="prompt-d${dayData.dayIndex}-v${v.varIndex}">${escHtml(v.prompt || '')}</div>
-        <div class="variation-image-slot" id="${slotId}">
-          <div class="slot-placeholder">Sin imagen</div>
-        </div>
-      </div>`
-  }
+  el.dataset.slot = slotData.slot
 
   el.innerHTML = `
     <div class="day-card-header">
-      <span class="day-name">${escHtml(dayData.day)}</span>
-      <span class="post-type-badge">${escHtml(dayData.postType || '')}</span>
+      <span class="day-name">${escHtml(slotData.day)}</span>
+      <span class="post-type-badge" style="background:${bg};color:${formatColor};padding:2px 7px;border-radius:4px;font-size:0.68rem">
+        ${escHtml(slotData.format)} · ${escHtml(slotData.contentType || '')}
+      </span>
     </div>
     <div class="day-card-body">
-      <div class="day-scene" contenteditable="true" id="scene-d${dayData.dayIndex}">${escHtml(dayData.scene || '')}</div>
-      <div class="day-caption" contenteditable="true" id="caption-d${dayData.dayIndex}">${escHtml(dayData.caption || '')}</div>
-      <div class="variation-list">${variationsHtml}</div>
+      <div class="day-scene" contenteditable="true" id="scene-content-${slotData.slot}">${escHtml(slotData.scene || '')}</div>
+      <div class="day-caption" contenteditable="true" id="caption-content-${slotData.slot}">${escHtml(slotData.caption || '')}</div>
+      <div class="variation-list">
+        <div class="variation-item">
+          <div class="variation-header">
+            <span class="shot-type-tag">Slot ${slotData.slot}</span>
+          </div>
+          <div class="variation-prompt" contenteditable="true" id="prompt-content-${slotData.slot}">${escHtml(slotData.prompt || '')}</div>
+          <div class="variation-image-slot" id="slot-content-${slotData.slot}">
+            <div class="slot-placeholder">Sin imagen</div>
+          </div>
+        </div>
+      </div>
     </div>`
   return el
 }
@@ -1881,43 +1880,23 @@ async function generateWeekImages() {
   if (!currentContentPlan) return
   const btn = document.getElementById('btn-generate-week')
   btn.disabled = true
-  btn.textContent = 'Generando semana... (puede tardar 10–20 minutos)'
+  btn.textContent = 'Generando... (puede tardar varios minutos)'
   document.getElementById('btn-save-week').style.display = 'none'
 
-  let completed = 0
-  const total = currentContentPlan.week.length
-
-  for (const dayData of currentContentPlan.week) {
-    for (const v of (dayData.variations || [])) {
-      const slot = document.getElementById(`slot-d${dayData.dayIndex}-v${v.varIndex}`)
-      if (slot) slot.innerHTML = '<div class="slot-spinner"></div>'
-    }
+  // Poner spinners en los 8 slots
+  for (let s = 1; s <= 8; s++) {
+    const slot = document.getElementById(`slot-content-${s}`)
+    if (slot) slot.innerHTML = '<div class="slot-spinner"></div>'
   }
 
-  setContentPlanStatus(`Lanzando ${total} runs en paralelo (1 por día, 4 imágenes c/u)...`)
-
-  const dayRuns = currentContentPlan.week.map(dayData => generateDayImages(dayData, () => {
-    completed++
-    setContentPlanStatus(`Días completados: ${completed}/${total}...`)
-  }))
-
-  try {
-    await Promise.all(dayRuns)
-    setContentPlanStatus('Semana completa generada. 20 imágenes listas.', 'success')
-    document.getElementById('btn-save-week').style.display = 'block'
-  } catch (err) {
-    setContentPlanStatus(`Error parcial: ${err.message}`, 'error')
-  } finally {
-    btn.disabled = false
-    btn.textContent = 'Generar Semana Completa — 20 Imágenes (5 días × 4 variaciones)'
+  // Recolectar los 8 prompts desde los campos editables
+  const prompts = []
+  for (let s = 1; s <= 8; s++) {
+    const el = document.getElementById(`prompt-content-${s}`)
+    prompts.push(el ? el.innerText.trim() : (currentContentPlan.week[s - 1]?.prompt || ''))
   }
-}
 
-async function generateDayImages(dayData, onComplete) {
-  const prompts = (dayData.variations || []).map((v, i) => {
-    const el = document.getElementById(`prompt-d${dayData.dayIndex}-v${i}`)
-    return el ? el.innerText.trim() : (v.prompt || '')
-  })
+  setContentPlanStatus('Lanzando run de contenido — 8 imágenes en paralelo...')
 
   try {
     const res = await fetch('/api/generate-content-day', {
@@ -1928,18 +1907,22 @@ async function generateDayImages(dayData, onComplete) {
     const data = await res.json()
     if (!res.ok || data.error) throw new Error(data.error || `HTTP ${res.status}`)
 
-    await pollDaySlot(data.runIds[0], dayData.dayIndex, dayData.variations?.length || 4)
-    if (onComplete) onComplete()
+    await pollContentRun(data.runId)
+    setContentPlanStatus('8 imágenes generadas. Semana lista.', 'success')
+    document.getElementById('btn-save-week').style.display = 'block'
   } catch (err) {
-    for (const v of (dayData.variations || [])) {
-      const slot = document.getElementById(`slot-d${dayData.dayIndex}-v${v.varIndex}`)
+    for (let s = 1; s <= 8; s++) {
+      const slot = document.getElementById(`slot-content-${s}`)
       if (slot) slot.innerHTML = `<div class="slot-placeholder" style="color:#f87171">Error: ${escHtml(err.message)}</div>`
     }
-    throw err
+    setContentPlanStatus(`Error: ${err.message}`, 'error')
+  } finally {
+    btn.disabled = false
+    btn.textContent = 'Generar 8 Imágenes'
   }
 }
 
-async function pollDaySlot(runId, dayIndex, varCount, deadline = Date.now() + 720_000) {
+async function pollContentRun(runId, deadline = Date.now() + 600_000) {
   while (Date.now() < deadline) {
     await sleep(POLL_INTERVAL)
     try {
@@ -1947,38 +1930,34 @@ async function pollDaySlot(runId, dayIndex, varCount, deadline = Date.now() + 72
       const data = await res.json()
 
       if (data.status === 'success') {
-        const images = data.images || []
-        for (let i = 0; i < varCount; i++) {
-          const slot   = document.getElementById(`slot-d${dayIndex}-v${i}`)
-          const imgUrl = images[i]
-          if (slot && imgUrl) {
-            const fname = `dia${dayIndex + 1}_var${i + 1}.jpg`
-            slot.textContent = ''
+        // contentImages: hasta 9 (1 body regenerado + 8 contenido) — tomamos las primeras 8
+        const imgs = (data.contentImages || []).slice(0, 8)
+        for (let i = 0; i < 8; i++) {
+          const slotEl = document.getElementById(`slot-content-${i + 1}`)
+          const imgUrl = imgs[i]
+          if (slotEl && imgUrl) {
+            slotEl.textContent = ''
             const img = document.createElement('img')
             img.src = imgUrl
-            img.alt = `Var ${i + 1}`
+            img.alt = `Slot ${i + 1}`
             img.addEventListener('click', () => window.open(imgUrl, '_blank'))
-            const btn = document.createElement('button')
-            btn.className = 'btn-download'
-            btn.textContent = 'Descargar'
-            btn.addEventListener('click', () => downloadImage(imgUrl, fname))
-            slot.appendChild(img)
-            slot.appendChild(btn)
-          } else if (slot) {
-            slot.innerHTML = '<div class="slot-placeholder" style="color:#f87171">Sin imagen</div>'
+            const dlBtn = document.createElement('button')
+            dlBtn.className = 'btn-download'
+            dlBtn.textContent = 'Descargar'
+            dlBtn.addEventListener('click', () => downloadImage(imgUrl, `slot${i + 1}.jpg`))
+            slotEl.appendChild(img)
+            slotEl.appendChild(dlBtn)
+          } else if (slotEl) {
+            slotEl.innerHTML = '<div class="slot-placeholder" style="color:#f87171">Sin imagen</div>'
           }
-        }
-        if (images.length < varCount) {
-          const err = new Error(`ComfyDeploy devolvio ${images.length}/${varCount} imagenes`)
-          err.fatal = true
-          throw err
         }
         return
       }
+
       if (data.status === 'error') {
-        for (let i = 0; i < varCount; i++) {
-          const slot = document.getElementById(`slot-d${dayIndex}-v${i}`)
-          if (slot) slot.innerHTML = `<div class="slot-placeholder" style="color:#f87171">${escHtml(data.message || 'error')}</div>`
+        for (let i = 0; i < 8; i++) {
+          const slotEl = document.getElementById(`slot-content-${i + 1}`)
+          if (slotEl) slotEl.innerHTML = `<div class="slot-placeholder" style="color:#f87171">${escHtml(data.message || 'error')}</div>`
         }
         const err = new Error(data.message || 'ComfyDeploy error')
         err.fatal = true
@@ -1986,14 +1965,14 @@ async function pollDaySlot(runId, dayIndex, varCount, deadline = Date.now() + 72
       }
     } catch (err) {
       if (err.fatal) throw err
-      console.warn('poll day error:', err.message)
+      console.warn('poll content error:', err.message)
     }
   }
-  for (let i = 0; i < varCount; i++) {
-    const slot = document.getElementById(`slot-d${dayIndex}-v${i}`)
-    if (slot) slot.innerHTML = '<div class="slot-placeholder" style="color:#f87171">Timeout</div>'
+  for (let i = 0; i < 8; i++) {
+    const slotEl = document.getElementById(`slot-content-${i + 1}`)
+    if (slotEl) slotEl.innerHTML = '<div class="slot-placeholder" style="color:#f87171">Timeout</div>'
   }
-  throw new Error('Timeout generando imagenes del dia')
+  throw new Error('Timeout generando imágenes de contenido')
 }
 
 async function downloadImage(url, filename) {

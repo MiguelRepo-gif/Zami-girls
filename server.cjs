@@ -32,22 +32,34 @@ loadEnv()
 const API_KEY               = process.env.VITE_COMFYDEPLOY_API_KEY || ''
 const ANTHROPIC_KEY         = process.env.ANTHROPIC_API_KEY || ''
 const ANTHROPIC_MODEL       = process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-6'
+const CC_API_KEY            = process.env.COMFYCLOUD_API_KEY || ''
 const DEPLOYMENT_ID_AION    = process.env.VITE_COMFYDEPLOY_AION_DEPLOYMENT_ID || 'c6e6b7f0-e574-4aa8-9012-54e8507202e2'
 const DEPLOYMENT_ID_BODY    = process.env.VITE_COMFYDEPLOY_BODY_DEPLOYMENT_ID || 'cabf22a3-a697-485c-a6df-b6c09ee4f2f1'
-const DEPLOYMENT_ID_CONTENT = process.env.VITE_COMFYDEPLOY_CONTENT_DEPLOYMENT_ID || '8d4702cb-c504-4bf2-8284-ee17d6e66633'
+// DEPLOYMENT_ID_CONTENT (8d4702cb) eliminado — Fase 4 migrada a ComfyCloud (cloud.comfy.org)
 const SUPABASE_URL          = process.env.VITE_SUPABASE_URL || ''
 const SUPABASE_KEY          = process.env.VITE_SUPABASE_ANON_KEY || ''
 const SUPABASE_BUCKET       = process.env.SUPABASE_BUCKET || 'zami-images'
 const PORT                  = 3333
 const HOST                  = '127.0.0.1'
 const CD_BASE               = 'api.comfydeploy.com'
+const CC_BASE               = 'cloud.comfy.org'
 const DATA_DIR              = path.join(__dirname, 'data')
 const INFLUENCERS_FILE      = path.join(DATA_DIR, 'influencers.json')
+const WORKFLOW_CONTENT_FILE = path.join(DATA_DIR, 'workflow-content.json')
 const MAX_JSON_BODY_BYTES   = 25 * 1024 * 1024
 const MAX_UPLOAD_BYTES      = 8 * 1024 * 1024
 const ALLOWED_IMAGE_TYPES   = new Set(['image/jpeg', 'image/png', 'image/webp'])
 const IMAGE_EXTENSIONS      = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' }
 let influencerWriteQueue    = Promise.resolve()
+
+// ── Load ComfyCloud content workflow ────────────────────────────────────────
+let workflowContent = null
+try {
+  workflowContent = JSON.parse(fs.readFileSync(WORKFLOW_CONTENT_FILE, 'utf8'))
+  console.log('[STARTUP] workflow-content.json cargado OK')
+} catch (e) {
+  console.warn('[STARTUP] workflow-content.json no encontrado — contenido UGC deshabilitado:', e.message)
+}
 
 // ── Influencers persistence ──────────────────────────────────────────────────
 function loadInfluencers() {
@@ -105,6 +117,143 @@ function cdRequest(method, cdPath, body) {
     if (payload) req.write(payload)
     req.end()
   })
+}
+
+// ── ComfyCloud helpers ───────────────────────────────────────────────────────
+function ccRequest(method, ccPath, body) {
+  return new Promise((resolve, reject) => {
+    const payload = body ? JSON.stringify(body) : null
+    const opts = {
+      hostname: CC_BASE,
+      path: ccPath,
+      method,
+      headers: {
+        'X-API-Key':    CC_API_KEY,
+        'Content-Type': 'application/json',
+        ...(payload ? { 'Content-Length': Buffer.byteLength(payload) } : {}),
+      },
+    }
+    const req = https.request(opts, res => {
+      let raw = ''
+      res.on('data', d => raw += d)
+      res.on('end', () => {
+        try { resolve({ status: res.statusCode, body: JSON.parse(raw) }) }
+        catch { resolve({ status: res.statusCode, body: raw }) }
+      })
+    })
+    req.on('error', reject)
+    if (payload) req.write(payload)
+    req.end()
+  })
+}
+
+// Descarga imagen desde URL pública (Supabase) y la sube a ComfyCloud como multipart.
+// Devuelve el filename asignado por ComfyCloud (usado en los nodos LoadImage).
+async function uploadImageToComfyCloud(imageUrl) {
+  // 1. Descargar imagen como buffer
+  const imgBuf = await new Promise((resolve, reject) => {
+    const proto = imageUrl.startsWith('https') ? https : require('http')
+    proto.get(imageUrl, r => {
+      const chunks = []
+      r.on('data', c => chunks.push(c))
+      r.on('end', () => resolve(Buffer.concat(chunks)))
+      r.on('error', reject)
+    })
+  })
+
+  // 2. Construir multipart/form-data manualmente (sin npm)
+  const boundary = '----CCBoundary' + Date.now() + Math.random().toString(36).slice(2)
+  const filename  = `zami_input_${Date.now()}.png`
+  const header    = Buffer.from(
+    `--${boundary}\r\nContent-Disposition: form-data; name="image"; filename="${filename}"\r\nContent-Type: image/png\r\n\r\n`
+  )
+  const footer    = Buffer.from(`\r\n--${boundary}--\r\n`)
+  const bodyBuf   = Buffer.concat([header, imgBuf, footer])
+
+  // 3. POST a ComfyCloud /api/upload/image
+  return new Promise((resolve, reject) => {
+    const opts = {
+      hostname: CC_BASE,
+      path:     '/api/upload/image',
+      method:   'POST',
+      headers: {
+        'X-API-Key':    CC_API_KEY,
+        'Content-Type': `multipart/form-data; boundary=${boundary}`,
+        'Content-Length': bodyBuf.length,
+      },
+    }
+    const req = https.request(opts, r => {
+      let raw = ''
+      r.on('data', d => raw += d)
+      r.on('end', () => {
+        try {
+          const data = JSON.parse(raw)
+          if (r.statusCode !== 200 && r.statusCode !== 201) {
+            return reject(new Error(`ComfyCloud upload ${r.statusCode}: ${raw}`))
+          }
+          resolve(data.name)
+        } catch (e) { reject(new Error(`ComfyCloud upload parse error: ${raw}`)) }
+      })
+    })
+    req.on('error', reject)
+    req.write(bodyBuf)
+    req.end()
+  })
+}
+
+// Lanza un run de contenido UGC en ComfyCloud.
+// prompts8: array de 8 strings (uno por slot / nodo Gemini).
+// Devuelve 'cc:{prompt_id}' — el prefijo permite detectar ComfyCloud en /api/status.
+async function startComfyCloudContentRun(faceUrl, bodyUrl, prompts8) {
+  if (!CC_API_KEY) throw new Error('COMFYCLOUD_API_KEY no configurada en .env')
+  if (!workflowContent) throw new Error('workflow-content.json no encontrado en data/')
+
+  // 1. Subir face y body a ComfyCloud en paralelo
+  console.log('  [CC] Subiendo imágenes a ComfyCloud...')
+  const [faceName, bodyName] = await Promise.all([
+    uploadImageToComfyCloud(faceUrl),
+    uploadImageToComfyCloud(bodyUrl),
+  ])
+  console.log(`  [CC] face→${faceName}  body→${bodyName}`)
+
+  // 2. Clonar workflow y hacer injecciones
+  const wf = JSON.parse(JSON.stringify(workflowContent))
+
+  // Inyectar filename de rostro en todos los LoadImage de imagen 1
+  const faceNodes = ['11','40','45','50','55','60','65','70']
+  faceNodes.forEach(id => { wf[id].inputs.image = faceName })
+
+  // Inyectar filename de cuerpo en todos los LoadImage de imagen 2
+  const bodyNodes = ['12','38','43','48','53','58','63','68']
+  bodyNodes.forEach(id => { wf[id].inputs.image = bodyName })
+
+  // Inyectar prompts en los 8 GeminiImage2Node (slots 1-8 en orden)
+  const geminiNodes = ['35','37','42','47','52','57','62','67']
+  geminiNodes.forEach((id, i) => {
+    wf[id].inputs.prompt = String(prompts8[i] || '')
+  })
+
+  // Poner filename_prefix único por slot → permite ordenar los assets al recibirlos
+  // SaveImage que corresponde a cada Gemini: 35→30, 37→41, 42→46, 47→51, 52→56, 57→61, 62→66, 67→71
+  const saveNodes = ['30','41','46','51','56','61','66','71']
+  saveNodes.forEach((id, i) => {
+    wf[id].inputs.filename_prefix = `ZCS${i + 1}`
+  })
+
+  // 3. Enviar a ComfyCloud
+  // extra_data.api_key_comfy_org es necesario para que los GeminiImage2Node
+  // puedan autenticarse internamente — sin esto lanza "Unauthorized: Please login first"
+  console.log('  [CC] Enviando workflow a ComfyCloud...')
+  const res = await ccRequest('POST', '/api/prompt', {
+    prompt: wf,
+    extra_data: { api_key_comfy_org: CC_API_KEY },
+  })
+  if (res.status !== 200 && res.status !== 201) {
+    throw new Error(`ComfyCloud submit ${res.status}: ${JSON.stringify(res.body)}`)
+  }
+  const promptId = res.body.prompt_id
+  console.log(`  [CC] prompt_id: ${promptId}`)
+  return 'cc:' + promptId
 }
 
 // ── AION face generation ─────────────────────────────────────────────────────
@@ -186,35 +335,8 @@ async function startBodyRunV2(faceUrl, promptBody) {
   return res.body.run_id
 }
 
-// ── Content UGC generation ───────────────────────────────────────────────────
-async function startContentDayRun(faceUrl, bodyUrl, prompts) {
-  if (!DEPLOYMENT_ID_CONTENT) throw new Error('VITE_COMFYDEPLOY_CONTENT_DEPLOYMENT_ID no configurado en .env')
-  const res = await cdRequest('POST', `/api/run/deployment/queue`, {
-    deployment_id: DEPLOYMENT_ID_CONTENT,
-    inputs: {
-      'prompt 1':          String(prompts[0] || ''),
-      'input_image 1':     String(faceUrl),
-      'input_image 2':     String(bodyUrl),
-      'filename_prefix 1': 'ComfyUI',
-      'prompt 2':          String(prompts[1] || ''),
-      'input_image 3':     String(faceUrl),
-      'input_image 4':     String(bodyUrl),
-      'filename_prefix 2': 'ComfyUI',
-      'prompt 3':          String(prompts[2] || ''),
-      'input_image 5':     String(faceUrl),
-      'input_image 6':     String(bodyUrl),
-      'filename_prefix 3': 'ComfyUI',
-      'prompt 4':          String(prompts[3] || ''),
-      'input_image 7':     String(faceUrl),
-      'input_image 8':     String(bodyUrl),
-      'filename_prefix 4': 'ComfyUI',
-    },
-  })
-  if (res.status !== 200 && res.status !== 201) {
-    throw new Error(`ComfyDeploy ${res.status}: ${JSON.stringify(res.body)}`)
-  }
-  return res.body.run_id
-}
+// ── Content UGC generation → vía ComfyCloud (startComfyCloudContentRun) ─────
+// startContentRun eliminado — deployment c6e6b7f0 ya no tiene nodos de contenido.
 
 // ── AI Persona generation — Claude API ───────────────────────────────────────
 async function generatePersona(nombre, nicho, faceUrl, bodyUrl) {
@@ -415,7 +537,21 @@ AI PERSONA COMPLETO:
 ${persona}
 ${historyBlock}
 TAREA:
-Genera un calendario de contenido UGC para 5 días (Lunes a Viernes). Tú decides el tema. No hay input del usuario.
+Genera exactamente 8 piezas de contenido UGC para la semana (Lunes a Viernes). Tú decides el tema. No hay input del usuario.
+Distribuye los 8 posts así: Lunes 2, Martes 1, Miércoles 2, Jueves 1, Viernes 2.
+
+SLOTS Y SUS ASPECT RATIOS (fijos en el workflow — no puedes cambiarlos):
+- Slot 1: 9:16 → Story o Reel vertical (close-up, espontáneo, selfie POV)
+- Slot 2: 9:16 → Story o Reel vertical (close-up, espontáneo, selfie POV)
+- Slot 3: 1:1  → Square (carrusel cover, moodboard, post de marca)
+- Slot 4: 1:1  → Square (carrusel cover, moodboard, post de marca)
+- Slot 5: 3:4  → Feed portrait lifestyle (cuadrado largo, ambiente natural)
+- Slot 6: 4:5  → Feed portrait editorial (retrato de moda o lifestyle principal)
+- Slot 7: 1:1  → Square (tercer post de marca o engagement)
+- Slot 8: 4:5  → Feed portrait editorial (retrato secundario)
+
+Asigna el tipo de contenido al slot que mejor encaje con su formato.
+Stories/Reels → slots 1-2. Square/carrusel → slots 3,4,7. Portrait editorial → slots 6,8. Lifestyle → slot 5.
 
 REGLAS FOTOGRÁFICAS UGC (aplica en TODOS los prompts):
 - "Shot on iPhone 15 Pro" — NUNCA studio lights
@@ -432,23 +568,20 @@ FORMATO: ÚNICAMENTE JSON válido. Sin markdown.
   "summary": "string",
   "week": [
     {
+      "slot": 1,
+      "format": "9:16",
+      "contentType": "Story/Reel",
       "day": "Lunes",
-      "dayIndex": 0,
-      "postType": "single photo",
-      "scene": "string en español",
-      "caption": "string con emojis",
-      "hashtags": ["#tag1"],
-      "variations": [
-        { "varIndex": 0, "shotType": "selfie", "prompt": "Shot on iPhone 15 Pro..." },
-        { "varIndex": 1, "shotType": "mirror selfie", "prompt": "..." },
-        { "varIndex": 2, "shotType": "POV candid", "prompt": "..." },
-        { "varIndex": 3, "shotType": "lifestyle moment", "prompt": "..." }
-      ]
+      "scene": "descripción en español",
+      "caption": "texto con emojis",
+      "hashtags": ["#tag"],
+      "prompt": "Shot on iPhone 15 Pro..."
     }
   ]
 }
 
-5 días (dayIndex 0–4), 4 variaciones por día (varIndex 0–3).` })
+Exactamente 8 objetos en "week", slots 1–8 en orden. Formatos obligatorios por slot:
+slot1=9:16, slot2=9:16, slot3=1:1, slot4=1:1, slot5=3:4, slot6=4:5, slot7=1:1, slot8=4:5` })
 
   const payload = JSON.stringify({
     model: ANTHROPIC_MODEL,
@@ -1171,19 +1304,19 @@ const server = http.createServer(async (req, res) => {
       const bodyUrl = (body.body_url || '').trim()
       const prompts = body.prompts || []
 
-      if (!faceUrl)        { json(res, 400, { error: 'face_url requerido' }); return }
-      if (!bodyUrl)        { json(res, 400, { error: 'body_url requerido' }); return }
-      if (!Array.isArray(prompts) || prompts.length !== 4 || prompts.some(p => typeof p !== 'string' || !p.trim())) {
-        json(res, 400, { error: 'prompts debe incluir exactamente 4 textos no vacios' }); return
+      if (!faceUrl) { json(res, 400, { error: 'face_url requerido' }); return }
+      if (!bodyUrl) { json(res, 400, { error: 'body_url requerido' }); return }
+      if (!Array.isArray(prompts) || prompts.length !== 8) {
+        json(res, 400, { error: 'prompts debe ser un array de exactamente 8 strings' }); return
       }
 
-      console.log(`\n[CONTENT-DAY] prompts=${prompts.length}`)
-      const runId = await startContentDayRun(faceUrl, bodyUrl, prompts)
+      console.log(`\n[CONTENT-RUN] slots=8 face=${faceUrl.split('/').pop()} body=${bodyUrl.split('/').pop()}`)
+      const runId = await startComfyCloudContentRun(faceUrl, bodyUrl, prompts)
       console.log(`  run: ${runId}`)
 
-      json(res, 200, { runIds: [runId] })
+      json(res, 200, { runId })
     } catch (err) {
-      console.error('[CONTENT-DAY ERROR]', err.message)
+      console.error('[CONTENT-RUN ERROR]', err.message)
       fail(res, err)
     }
     return
@@ -1193,7 +1326,36 @@ const server = http.createServer(async (req, res) => {
   const statusMatch = pathname.match(/^\/api\/status\/([^/]+)$/)
   if (req.method === 'GET' && statusMatch) {
     try {
-      const runId = statusMatch[1]
+      const runId = decodeURIComponent(statusMatch[1])
+
+      // ── ComfyCloud run (prefijo cc:) ──────────────────────────────────────
+      if (runId.startsWith('cc:')) {
+        const promptId = runId.slice(3)
+        const stRes = await ccRequest('GET', `/api/job/${promptId}/status`, null)
+        const st    = (stRes.body && stRes.body.status) ? stRes.body.status : ''
+        console.log(`[CC-STATUS] ${promptId} -> ${st}`)
+
+        if (st === 'error' || st === 'cancelled') {
+          return json(res, 200, { status: 'error', message: st })
+        }
+        if (st !== 'completed') {
+          return json(res, 200, { status: 'running' })
+        }
+
+        // Completado: obtener assets ordenados por slot (ZCS1–ZCS8)
+        const assetsRes = await ccRequest('GET', `/api/assets?prompt_id=${promptId}&limit=20`, null)
+        const assets    = Array.isArray(assetsRes.body) ? assetsRes.body
+                          : (assetsRes.body && Array.isArray(assetsRes.body.items)) ? assetsRes.body.items
+                          : []
+        const contentImages = assets
+          .filter(a => a.name && a.name.startsWith('ZCS'))
+          .sort((a, b) => a.name.localeCompare(b.name))
+          .map(a => a.preview_url)
+        console.log(`  [CC] contentImages: ${contentImages.length}`, contentImages.map(u => (u || '').split('/').pop()))
+        return json(res, 200, { status: 'success', contentImages })
+      }
+
+      // ── ComfyDeploy run (sin prefijo) ────────────────────────────────────
       const data  = await getRun(runId)
       const st    = data.status || ''
 
@@ -1202,10 +1364,10 @@ const server = http.createServer(async (req, res) => {
         console.log('OUTPUTS:', JSON.stringify(data.outputs, null, 2))
         const images = extractImages(data.outputs)
         console.log(`  images extracted: ${images.length}`, images.map(u => u.split('/').pop()))
-        // Node 14 (AION) prefix "Nano Banana Pro" → URL-encoded as Nano%20Banana, NOT ComfyUI
-        // Node 651 (Gemini body) prefix "ComfyUI" → no special chars, safe to match with includes
+        // face: "Nano Banana Pro" prefix (URL-encoded, no 'ComfyUI')
+        // body: "ComfyUI" prefix
         const body_url = images.find(u => u.includes('ComfyUI')) || null
-        const face_url = images.find(u => !u.includes('ComfyUI')) || images[0] || null
+        const face_url = images.find(u => !u.includes('ComfyUI')) || null
         console.log(`  face_url: ${face_url ? face_url.split('/').pop() : 'none'}`)
         console.log(`  body_url: ${body_url ? body_url.split('/').pop() : 'none'}`)
         json(res, 200, { status: 'success', images, face_url, body_url })
@@ -1246,7 +1408,7 @@ server.listen(PORT, HOST, () => {
     console.log(`   Anthropic:   ${ANTHROPIC_KEY ? ANTHROPIC_KEY.slice(0, 8) + '...' : 'NO CONFIGURADA'}`)
     console.log(`   Modelo:      ${ANTHROPIC_MODEL}`)
     console.log(`   AION deploy: ${DEPLOYMENT_ID_AION}`)
-    console.log(`   Content:     ${DEPLOYMENT_ID_CONTENT}`)
+    console.log(`   ComfyCloud:  ${CC_API_KEY ? CC_API_KEY.slice(0, 8) + '...' : 'NO CONFIGURADA'} (Fase 4 UGC)`)
     console.log(`   Supabase:    ${SUPABASE_URL || 'NO CONFIGURADA'} / bucket: ${SUPABASE_BUCKET}`)
     console.log(`   Influencers: ${db.influencers.length} guardadas`)
     console.log()
