@@ -221,9 +221,12 @@ PASO 1 — Claude elige params de rostro + genera prompt_body
            content: [ ...imágenes base64..., nicho, descripción ]
            Claude devuelve JSON con 43 face params + 7 body params + "prompt_body" (51 campos total)
            Destructuring: bodyParamKeys filtra { body_type, bust, waist, glutes, hips, legs, shoulders }
+           Server aplica overrides determinísticos desde el texto del usuario:
+             curvy/busto grande/trasero grande/caderas/cintura → enums altos o extremos exactos
   Server:  POST ComfyDeploy /api/run/deployment/queue
            deployment_id: e833a575-893b-49f2-8687-4aa5291d31cc
-           inputs: { photo_type, "imagen rostro": "Nano Banana Pro", "save_image": "ComfyUI", model, image_model, resolution, ...faceParams, ...bodyParams(non-auto), prompt_body }
+           inputs: { photo_type, "imagen rostro": "Nano Banana Pro", "save_image": "ComfyUI", model, image_model, resolution, ...faceParams, body_type, bust, waist, glutes, hips, legs, shoulders, prompt_body }
+           Antes del queue imprime [AION PAYLOAD AUDIT] con deployment_id, photo_type, calidad, prompt_body y los 7 body params exactos.
   Server:  devuelve { runId, selected_params: { ...faceParams, ...bodyParams }, prompt_body: promptBody }
   Browser: renderClaudeParamsSummary(selected_params, prompt_body)
            — muestra grid de params + sección "Body prompt:" con texto completo
@@ -377,8 +380,24 @@ Toggle independiente del Toggle B. IDs en UI: `bodyparam-{name}`.
 | `legs` | `bodyparam-legs` | Cuerpo |
 | `shoulders` | `bodyparam-shoulders` | Cuerpo |
 
-Opciones default: `"auto"` — si el valor es `"auto"`, se excluye del payload.
+Opciones default: `"auto"` — desde la auditoría de body params, el servidor envía `"auto"` explícito para cualquier body param no seleccionado.
 Textarea `body-description` → pasa directo como `prompt_body` al workflow.
+
+**Regla de payload:** los 7 body params siempre se envían al deployment. Si el usuario no eligió un valor, el servidor manda `"auto"` explícito. Si el usuario o Claude elige un valor, se valida contra las opciones exactas del workflow antes de gastar un run. Si el texto pide cuerpo curvy/extremo, el servidor fuerza enums altos/extremos antes del queue.
+
+**Version probada y aprobada — auditoria body params:** la fuente de verdad es el log local `[AION PAYLOAD AUDIT]` justo antes de llamar a ComfyDeploy. En la prueba aprobada, el payload final llego armado con `deployment_id: e833a575-893b-49f2-8687-4aa5291d31cc`, `model: gemini-3.1-pro-preview`, `image_model: Nano Banana Pro (gemini-3-pro-image-preview)`, `resolution: 512px`, `prompt_body` no vacio y estos 7 body params explicitos:
+```json
+{
+  "body_type": "curvy fuller figure",
+  "bust": "massive oversized bust ultra-exaggerated",
+  "waist": "very narrow waist extreme hourglass",
+  "glutes": "massive oversized glutes ultra-exaggerated",
+  "hips": "very wide hips",
+  "legs": "full thick thighs",
+  "shoulders": "proportionate shoulders"
+}
+```
+Esto confirma que la app/servidor ya no depende solo de texto libre para el cuerpo: manda los enums manuales del workflow y usa `prompt_body` como refuerzo. Si ComfyDeploy genera un cuerpo moderado con este audit correcto, el siguiente diagnostico ya no esta en `server.cjs`, sino en como `AionBodyReferenceNode` interpreta/suaviza esos enums y su prompt interno.
 
 **Calidad del motor (3 params):**
 | Param | ID en UI | Grupo |
@@ -425,7 +444,7 @@ Content-Type: application/json
     "sex": "female",               ← solo si toggle B ON (face params)
     "ethnicity": "...",
     ... (hasta 43 COMBO face params)
-    "body_type": "hourglass figure",  ← solo si toggle B ON y valor ≠ "auto" (7 body params)
+    "body_type": "hourglass figure",  ← siempre enviado; "auto" si no aplica
     "bust": "full bust",
     "waist": "narrow defined waist",
     "glutes": "full prominent glutes",
@@ -476,7 +495,7 @@ POST https://api.anthropic.com/v1/messages
 { "model": "claude-sonnet-4-6", "max_tokens": 1500,
   "system": "<AION_EXPERT_SYSTEM_PROMPT>",
   "messages": [{ "role": "user", "content": [ ...reference_images_base64..., { "type": "text", "text": description } ] }] }
-→ JSON puro con 44 campos: 43 face params + "prompt_body"
+→ JSON puro con 51 campos: 43 face params + 7 body params + "prompt_body"
 ```
 
 ### Anthropic — Body Prompt (Modo Manual con body_params)
@@ -680,13 +699,15 @@ El `prompt` de cada nodo Gemini es el texto creativo generado por Claude (80-120
 - **Run unificado rostro + cuerpo** — deployment `e833a575` incluye AION (nodo 66) + AionBodyReferenceNode (nodo 227) en el mismo run. La salida de AION se conecta internamente como `face_reference`. No hay segundo deployment.
 - **URL detection por prefijo** — `"ComfyUI"` (nodo 651, cuerpo) no tiene espacios, nunca se URL-encoda. `"Nano Banana Pro"` (nodo 14, rostro) se encoda como `Nano%20Banana%20Pro`. La detección usa `includes('ComfyUI')` — nunca regex sobre el prefijo del rostro.
 - **4 toggles en Modo Manual (v11)** — A: Imágenes de referencia · B: Parámetros de Rostro (43) · D: Parámetros de Cuerpo (7 + calidad) · C: Prompt libre. Toggle B y Toggle D son independientes: `sectionState.params` vs `sectionState.body`.
-- **7 body params directos** — se recolectan de `bodyparam-{name}` selects en Toggle D (body_type, bust, waist, glutes, hips, legs, shoulders). Si el valor es `"auto"`, se excluye del payload. Van directo al `AionBodyReferenceNode` sin pasar por Claude.
+- **7 body params directos** — se recolectan de `bodyparam-{name}` selects en Toggle D (body_type, bust, waist, glutes, hips, legs, shoulders). Siempre van en el payload; si no hay selección, el servidor manda `"auto"` explícito. Van directo al `AionBodyReferenceNode` sin pasar por Claude.
 - **`body_description` pasa directo como `prompt_body`** — textarea en Toggle D, va sin procesamiento al campo `brief_text` del nodo 227. `BODY_EXPERT_SYSTEM_PROMPT` eliminado.
 - **AION_EXPERT_SYSTEM_PROMPT devuelve 51 campos** — 43 face params + 7 body params + `prompt_body` (max_tokens: 2000). Incluye INTENSITY MAPPING: palabras como "súper, enorme, ultra" → enums máximos (ej. `massive oversized bust ultra-exaggerated`); "grande, curvy" → enums altos; lenguaje extremo también refuerza el `prompt_body`.
+- **Body param overrides determinísticos** — además de confiar en Claude, `server.cjs` analiza el texto del usuario y fuerza los 7 enums del cuerpo cuando detecta lenguaje corporal: `curvy`, `busto/pechos/tetona/busty`, `trasero/culo/culona/nalgona/booty`, `caderas`, `cintura/hourglass`, `piernas/muslos`. En Modo Claude estos overrides reemplazan cualquier selección tímida; en Modo Manual completan parámetros faltantes desde `body_description`/prompt sin pisar selects manuales ya elegidos.
+- **AION PAYLOAD AUDIT** — antes de enviar el run a ComfyDeploy, el servidor imprime `deployment_id`, `photo_type`, `model`, `image_model`, `resolution`, `prompt_body` y los 7 body params finales. Esta es la fuente de verdad para comparar contra los logs de ComfyDeploy.
 - **Dos modos de Fase 1** — Manual (4 toggles) y Claude-guided (descripción natural + imágenes para Claude).
 - **Modo Claude: images solo para Anthropic** — Las imágenes de referencia del modo Claude van en base64 directo a la API de Anthropic, NO a Supabase ni a AION.
 - **ExternalImage nodes directos** — el workflow AION v4 conecta `ExternalImage` directo al `AionThetaNode`. Sin `LoadImage` hardcodeados. Input `None` = AION lo ignora.
-- **Toggle = omit** — cuando un toggle está OFF, esas keys se omiten del payload completamente.
+- **Toggle = omit con excepcion de cuerpo** — cuando Toggle A/B/C esta OFF, esas keys se omiten del payload. Los 7 body params son la excepcion: siempre se envian al deployment, con `"auto"` explicito si no hay seleccion o override.
 - **Upload Supabase antes de ComfyDeploy** — imágenes de referencia van a Supabase primero, luego URL pública a ComfyDeploy.
 - **`imagen rostro` hardcodeado** — siempre `"Nano Banana Pro"` (era `"imagen final"` en v9, renombrado en v10).
 - **9 image slots** — `eyes, eyebrows, nose, lips, forehead, jawline, hairline, skin, full_face`.

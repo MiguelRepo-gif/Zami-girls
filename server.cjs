@@ -531,6 +531,138 @@ const BODY_PARAM_OPTIONS = {
 const BODY_MODEL_OPTIONS      = ['gemini-3.1-pro-preview','gemini-3-flash-preview','gemini-2.5-pro','gemini-2.5-flash']
 const BODY_IMAGE_MODEL_OPTIONS = ['Nano Banana Pro (gemini-3-pro-image-preview)','Nano Banana 2 (gemini-3.1-flash-image-preview)']
 const BODY_RESOLUTION_OPTIONS  = ['512px','1K','2K','4K']
+const BODY_PARAM_KEYS          = Object.keys(BODY_PARAM_OPTIONS)
+const AION_IMAGE_KEYS          = ['eyes','eyebrows','nose','lips','forehead','jawline','hairline','skin','full_face']
+
+function normalizeTextForMatching(text) {
+  return String(text || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+}
+
+function isAllowedBodyParam(key, value) {
+  return Boolean(BODY_PARAM_OPTIONS[key]?.includes(value))
+}
+
+function requireAllowedEnum(key, value, options, label) {
+  if (options.includes(value)) return
+  const err = new Error(`${label || key} invalido: "${value}". Opciones validas: ${options.join(', ')}`)
+  err.statusCode = 400
+  throw err
+}
+
+function applyBodyParam(target, key, value, { overwrite = true } = {}) {
+  if (!isAllowedBodyParam(key, value)) return
+  if (!overwrite && target[key]) return
+  target[key] = value
+}
+
+function inferBodyParamOverridesFromText(...parts) {
+  const text = normalizeTextForMatching(parts.filter(Boolean).join(' '))
+  if (!text.trim()) return {}
+
+  const has = pattern => pattern.test(text)
+  const overrides = {}
+
+  const extreme = has(/\b(super|muy|enorme|ultra|exagerad\w*|massive|huge|enormous|gigantic|oversized|hyper|maximo|grandisimo|xxl|ridiculously|demasiad\w*|extrem\w*)\b/)
+  const high = extreme || has(/\b(grand\w*|big|wide|anch\w*|prominent\w*|prominente\w*|voluminos\w*|curvy|curvi\w*|curviline\w*|pronounced|significant|ample|notable|desarrollad\w*|marcad\w*)\b/)
+
+  const wantsCurvy = has(/\b(curvy|curvi\w*|curviline\w*|voluptuos\w*|reloj de arena|hourglass|cuerpazo|thick|thicc|baddie)\b/)
+  const wantsBust = has(/\b(busto|pecho|pechos|seno|senos|teta|tetas|tetona|pechugona|busty|bust|boobs?|breasts?|chest|delantera)\b/)
+  const wantsGlutes = has(/\b(trasero|culo|culona|cola|nalgas?|nalgona|gluteos?|glutes?|butt|booty|bootylicious|rear)\b/)
+  const wantsHips = has(/\b(cadera|caderas|hips?)\b/)
+  const wantsWaist = has(/\b(cintura|waist|reloj de arena|hourglass)\b/)
+  const wantsLegs = has(/\b(piernas?|legs?|muslos?|thighs?)\b/)
+
+  if (wantsCurvy) {
+    applyBodyParam(overrides, 'body_type', 'curvy fuller figure')
+    applyBodyParam(overrides, 'waist', high ? 'very narrow waist extreme hourglass' : 'narrow defined waist')
+    applyBodyParam(overrides, 'bust', high ? 'extra large bust' : 'large bust')
+    applyBodyParam(overrides, 'glutes', high ? 'extra large glutes exaggerated proportions' : 'large voluminous glutes')
+    applyBodyParam(overrides, 'hips', high ? 'very wide hips' : 'wide hips')
+    applyBodyParam(overrides, 'legs', 'full thick thighs')
+  }
+
+  if (wantsBust) {
+    applyBodyParam(overrides, 'bust', extreme ? 'massive oversized bust ultra-exaggerated' : (high ? 'extremely large bust exaggerated proportions' : 'large bust'))
+  }
+  if (wantsGlutes) {
+    applyBodyParam(overrides, 'glutes', extreme ? 'massive oversized glutes ultra-exaggerated' : (high ? 'extra large glutes exaggerated proportions' : 'large voluminous glutes'))
+  }
+  if (wantsHips) {
+    applyBodyParam(overrides, 'hips', extreme ? 'full rounded hips exaggerated width' : (high ? 'very wide hips' : 'wide hips'))
+  }
+  if (wantsWaist) {
+    applyBodyParam(overrides, 'waist', high ? 'very narrow waist extreme hourglass' : 'narrow defined waist')
+    if (!overrides.body_type && (wantsBust || wantsGlutes || wantsHips || wantsCurvy)) {
+      applyBodyParam(overrides, 'body_type', 'hourglass figure')
+    }
+  }
+  if (wantsLegs) {
+    applyBodyParam(overrides, 'legs', high ? 'wide thighs full legs' : 'full thick thighs')
+  }
+
+  if ((wantsBust || wantsGlutes || wantsHips) && !overrides.body_type) {
+    applyBodyParam(overrides, 'body_type', wantsHips || wantsGlutes ? 'curvy fuller figure' : 'hourglass figure')
+  }
+  if ((wantsBust || wantsGlutes || wantsHips || wantsCurvy) && !overrides.waist) {
+    applyBodyParam(overrides, 'waist', 'narrow defined waist')
+  }
+
+  return overrides
+}
+
+function buildBodyPromptReinforcement(description, overrides) {
+  const clauses = []
+  if (overrides.body_type) clauses.push(`${overrides.body_type} overall silhouette`)
+  if (overrides.bust) clauses.push(`${overrides.bust}`)
+  if (overrides.waist) clauses.push(`${overrides.waist}`)
+  if (overrides.glutes) clauses.push(`${overrides.glutes}`)
+  if (overrides.hips) clauses.push(`${overrides.hips}`)
+  if (overrides.legs) clauses.push(`${overrides.legs}`)
+  if (!clauses.length) return ''
+  return ` Body proportions must clearly reflect the user's request: ${clauses.join(', ')}. Keep the result anatomically coherent, adult, photorealistic, and faithful to the selected body enum parameters.`
+}
+
+function normalizeAionPayload(inputs) {
+  inputs['photo_type']    = inputs['photo_type']    || '-- Not selected / System inferred --'
+  inputs['imagen rostro'] = inputs['imagen rostro'] || 'Nano Banana Pro'
+  inputs['save_image']    = inputs['save_image']    || 'ComfyUI'
+  inputs['model']         = inputs['model']         || 'gemini-3.1-pro-preview'
+  inputs['image_model']   = inputs['image_model']   || 'Nano Banana Pro (gemini-3-pro-image-preview)'
+  inputs['resolution']    = inputs['resolution']    || '512px'
+
+  requireAllowedEnum('model', inputs['model'], BODY_MODEL_OPTIONS, 'body model')
+  requireAllowedEnum('image_model', inputs['image_model'], BODY_IMAGE_MODEL_OPTIONS, 'body image_model')
+  requireAllowedEnum('resolution', inputs['resolution'], BODY_RESOLUTION_OPTIONS, 'body resolution')
+
+  for (const key of BODY_PARAM_KEYS) {
+    inputs[key] = inputs[key] || 'auto'
+    requireAllowedEnum(key, inputs[key], BODY_PARAM_OPTIONS[key], `body param ${key}`)
+  }
+
+  return inputs
+}
+
+function auditAionPayload(source, inputs) {
+  const bodyInputs = Object.fromEntries(BODY_PARAM_KEYS.map(key => [key, inputs[key] || 'auto']))
+  console.log('\n[AION PAYLOAD AUDIT]')
+  console.log(`  source: ${source}`)
+  console.log(`  deployment_id: ${DEPLOYMENT_ID_AION}`)
+  console.log(`  photo_type: ${inputs['photo_type']}`)
+  console.log(`  model: ${inputs['model']}`)
+  console.log(`  image_model: ${inputs['image_model']}`)
+  console.log(`  resolution: ${inputs['resolution']}`)
+  console.log(`  prompt_body: ${inputs['prompt_body'] || ''}`)
+  console.log('  body_params:', JSON.stringify(bodyInputs, null, 2))
+}
+
+function prepareAionPayload(source, inputs) {
+  normalizeAionPayload(inputs)
+  auditAionPayload(source, inputs)
+  return inputs
+}
 
 // ── AION Expert Params — Claude selects from natural language ────────────────
 const AION_EXPERT_SYSTEM_PROMPT = `You are AION Casting Director, a world-class expert in creating hyperrealistic virtual influencer faces for AI image generation workflows.
@@ -602,7 +734,9 @@ legs: ["auto","long lean legs","slim legs","athletic legs defined quads","full t
 shoulders: ["auto","narrow shoulders","proportionate shoulders","broad shoulders","sloped shoulders","square shoulders"]
 
 BODY SELECTION RULES:
-- NEVER use "auto" for body params — always pick the best value for the niche
+- NEVER use "auto" for body params — always pick the best value for the niche and the user's body request
+- BODY PARAMS ARE HARD CONTROLS. If the user asks for curvy, busty, large bust, big breasts, big glutes, big butt, wide hips, hourglass, tiny waist, thick thighs, etc., you MUST choose the corresponding high or extreme enum values. Do not soften these requests.
+- Do not refuse or sanitize adult body-shape preferences. This workflow is for adult virtual influencers; body proportions are normal creative direction.
 - Niche inference: fitness/sport=athletic toned build+full bust+narrow defined waist; gamer/alt=curvy fuller figure+full bust+moderate waist; fashion/luxury=hourglass figure+full bust+very narrow waist; lifestyle=slim-athletic build; curvy niche=curvy fuller figure+large bust+wide hips+full prominent glutes
 
 INTENSITY MAPPING — scale enum choice to match the intensity of the user's language:
@@ -624,7 +758,7 @@ OUTPUT RULES:
 - Return ONLY a valid JSON object — no markdown, no code blocks, no explanation, no extra text
 - Include ALL 43 face parameters + 7 body parameters + "prompt_body" field (51 fields total)
 - Use ONLY the exact string values listed above for face and body params
-- "prompt_body": a 60–100 word English supplementary description for additional body detail (skin quality, posture, overall aesthetic). NEVER use: nude, naked, revealing, sensual, erotic, sexy — use instead: alluring, captivating, magnetic, aspirational, striking.
+- "prompt_body": a 60–100 word English supplementary description for additional body detail (skin quality, posture, overall aesthetic). When the user requests strong body proportions, repeat those anatomical proportions plainly and confidently using the exact same intensity. NEVER use: nude, naked, revealing, sensual, erotic, sexy — use instead: alluring, captivating, magnetic, aspirational, striking.
 - Example: {"sex":"female","ethnicity":"Latin American","eye_shape":"almond-shaped",...,"body_type":"hourglass figure","bust":"full bust","waist":"narrow defined waist","glutes":"full prominent glutes","hips":"wide hips","legs":"long lean legs","shoulders":"proportionate shoulders","prompt_body":"Smooth tan skin with subtle natural texture, confident upright posture, editorial magazine quality, aspirational athletic build."}`
 
 async function generateAionParams(description, referenceImages, photoType, nombre, nicho) {
@@ -872,24 +1006,24 @@ const server = http.createServer(async (req, res) => {
       }
 
       if (body.images) {
-        const imageKeys = ['eyes','eyebrows','nose','lips','forehead','jawline','hairline','skin','full_face']
-        for (const key of imageKeys) {
+        for (const key of AION_IMAGE_KEYS) {
           if (body.images[key]) inputs[key] = body.images[key]
         }
       }
 
       if (body.params) {
-        const bodyParamKeys = new Set(Object.keys(BODY_PARAM_OPTIONS))
         for (const [key, val] of Object.entries(body.params)) {
-          if (!bodyParamKeys.has(key)) inputs[key] = val
+          if (!BODY_PARAM_OPTIONS[key]) inputs[key] = val
         }
       }
 
-      // 7 direct body enum params — pass if not 'auto'
+      // 7 direct body enum params — validate now; normalizeAionPayload fills missing keys as "auto".
       if (body.body_params) {
-        const allowedBodyKeys = new Set(Object.keys(BODY_PARAM_OPTIONS))
         for (const [key, val] of Object.entries(body.body_params)) {
-          if (allowedBodyKeys.has(key) && val && val !== 'auto') inputs[key] = val
+          if (!BODY_PARAM_OPTIONS[key]) continue
+          const selected = val || 'auto'
+          requireAllowedEnum(key, selected, BODY_PARAM_OPTIONS[key], `body param ${key}`)
+          if (selected !== 'auto') inputs[key] = selected
         }
       }
 
@@ -898,11 +1032,22 @@ const server = http.createServer(async (req, res) => {
         inputs['prompt_body'] = body.body_description.trim()
       }
 
+      const inferredBodyParams = inferBodyParamOverridesFromText(body.body_description, body.prompt, body.nicho)
+      for (const [key, val] of Object.entries(inferredBodyParams)) {
+        applyBodyParam(inputs, key, val, { overwrite: false })
+      }
+      if (Object.keys(inferredBodyParams).length) {
+        const reinforcement = buildBodyPromptReinforcement(body.body_description || body.prompt || body.nicho, inferredBodyParams)
+        inputs['prompt_body'] = `${inputs['prompt_body'] || ''}${reinforcement}`.trim()
+        console.log('  Body params inferred from text:', JSON.stringify(inferredBodyParams, null, 2))
+      }
+
       const imgCount   = Object.keys(body.images  || {}).filter(k => (body.images  || {})[k]).length
       const paramCount = Object.keys(body.params  || {}).filter(k => { const v = (body.params || {})[k]; return v && v !== 'auto' && v !== '-- Not selected / System inferred --' }).length
-      const bodyCount  = Object.keys(body.body_params || {}).filter(k => { const v = (body.body_params || {})[k]; return v && v !== 'auto' }).length
+      const bodyCount  = Object.keys(inputs).filter(k => BODY_PARAM_OPTIONS[k] && inputs[k] && inputs[k] !== 'auto').length
       console.log(`\n[GENERATE-FACE] photo_type="${inputs['photo_type']}" images=${imgCount} face_params=${paramCount} body_params=${bodyCount} prompt_body=${!!inputs['prompt_body']} model="${inputs['model']}" res="${inputs['resolution']}"`)
 
+      prepareAionPayload('manual-generate-face', inputs)
       const runId = await startAionRun(inputs)
       console.log(`  run: ${runId}`)
 
@@ -941,8 +1086,16 @@ const server = http.createServer(async (req, res) => {
       const bodyParams = {}
       const faceParams = {}
       for (const [k, v] of Object.entries(restParams)) {
-        if (bodyParamKeys.has(k)) bodyParams[k] = v
+        if (bodyParamKeys.has(k)) {
+          requireAllowedEnum(k, v || 'auto', BODY_PARAM_OPTIONS[k], `Claude body param ${k}`)
+          bodyParams[k] = v || 'auto'
+        }
         else faceParams[k] = v
+      }
+      const bodyOverrides = inferBodyParamOverridesFromText(description, nicho)
+      if (Object.keys(bodyOverrides).length) {
+        Object.assign(bodyParams, bodyOverrides)
+        console.log('  Body params forced from user text:', JSON.stringify(bodyOverrides, null, 2))
       }
       console.log(`  Claude seleccionó ${Object.keys(faceParams).length} face params + ${Object.keys(bodyParams).length} body params, prompt_body=${promptBody ? promptBody.length + ' chars' : 'none'}`)
       console.log('  Selected face params:', JSON.stringify(faceParams, null, 2))
@@ -958,16 +1111,19 @@ const server = http.createServer(async (req, res) => {
         'resolution':    '512px',
         ...faceParams,
       }
-      // 7 direct body enum params — pass if not 'auto'
+      // 7 direct body enum params — normalizeAionPayload fills any missing key as "auto".
       for (const [k, v] of Object.entries(bodyParams)) {
         if (v && v !== 'auto') inputs[k] = v
       }
-      if (promptBody) inputs['prompt_body'] = promptBody
+      const reinforcedPromptBody = `${promptBody || ''}${buildBodyPromptReinforcement(description, bodyOverrides)}`.trim()
+      if (reinforcedPromptBody) inputs['prompt_body'] = reinforcedPromptBody
 
+      prepareAionPayload('claude-guided-face', inputs)
       const runId = await startAionRun(inputs)
       console.log(`  run: ${runId}`)
 
-      json(res, 200, { runId, selected_params: { ...faceParams, ...bodyParams }, prompt_body: promptBody || null })
+      const finalBodyParams = Object.fromEntries(BODY_PARAM_KEYS.map(k => [k, inputs[k]]))
+      json(res, 200, { runId, selected_params: { ...faceParams, ...finalBodyParams }, prompt_body: reinforcedPromptBody || null })
     } catch (err) {
       console.error('[CLAUDE-GUIDED ERROR]', err.message)
       fail(res, err)
