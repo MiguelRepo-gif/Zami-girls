@@ -285,10 +285,10 @@ Server:  returns { url: "https://{SUPABASE_URL}/storage/v1/object/public/zami-im
 Browser: guarda url en uploadedImages[slotId]
 ```
 
-### Fase 4 — Contenido UGC Semanal (ComfyCloud)
+### Fase 4 — Contenido UGC Semanal (ComfyDeploy)
 
-**Motor:** ComfyCloud (`cloud.comfy.org`) — workflow estándar ComfyUI vía REST API.
-**Separación de motores:** ComfyDeploy `c6e6b7f0` solo genera rostro+cuerpo. ComfyCloud genera el contenido.
+**Motor:** ComfyDeploy deployment `f9822b81-9ebc-48e2-b39c-0e8034e90554` — 14 slots (8 activos, 6 con prompts reciclados).
+**Separación de motores:** ComfyDeploy `c6e6b7f0` solo genera rostro+cuerpo. ComfyDeploy `f9822b81` genera el contenido UGC.
 
 ```
 FASE 4 — Contenido Semanal (se repite cada semana por cada influencer)
@@ -307,40 +307,26 @@ FASE 4 — Contenido Semanal (se repite cada semana por cada influencer)
                Slots 6, 8 → 4:5 (Feed portrait)
     Result:  JSON con theme, summary, week[8 piezas]
 
-  Paso B — Imágenes (ComfyCloud):
+  Paso B — Imágenes (ComfyDeploy):
     Usuario: edita prompts si quiere → clic "Generar 8 Imágenes"
     Browser: POST /api/generate-content-day { face_url, body_url, prompts[8] }
-    Server:  startComfyCloudContentRun(faceUrl, bodyUrl, prompts8)
-             1. Sube face+body a ComfyCloud (uploadImageToComfyCloud × 2 en paralelo)
-             2. Clona workflow-content.json, inyecta nombres, prompts y prefijos ZCS1-ZCS8
-             3. POST cloud.comfy.org/api/prompt { prompt: wf, extra_data: { api_key_comfy_org } }
-             4. Devuelve runId = "cc:" + prompt_id
-    Browser: pollContentRun(runId) — GET /api/status/cc:{id} cada 8s
-    Server:  GET cloud.comfy.org/api/job/{id}/status → pending|in_progress|completed|error
-             Cuando completed: GET cloud.comfy.org/api/assets?prompt_id={id}&limit=20
-             Filtra assets que comienzan con "ZCS", ordena por nombre → 8 preview_url
+    Server:  startComfyDeployContentRun(faceUrl, bodyUrl, prompts8)
+             1. Construye inputs con 14 slots:
+                - Slots 1-8: face_url, body_url, prompts reales de Claude, filename_prefix ZCS1-ZCS8
+                - Slots 9-14: face_url, body_url, prompts reciclados (prompts8[0..5]), filename_prefix skip9-skip14
+             2. POST api.comfydeploy.com/api/run/deployment/queue
+                deployment_id: f9822b81-9ebc-48e2-b39c-0e8034e90554
+                inputs: { "rostro 1": faceUrl, "cuerpo 1": bodyUrl, "prompt contenido 1": prompt, "contenido final 1": "ZCS1", ... }
+             3. Devuelve runId = "cdc:" + run_id
+    Browser: pollContentRun(runId) — GET /api/status/cdc:{id} cada 8s
+    Server:  GET api.comfydeploy.com/api/run/{id} → status: queued|running|started|uploading|success|failed
+             Cuando success: extractImages(outputs) → filtrar por filename que empieza con ZCS → ordenar numéricamente → 8 URLs
     Browser: muestra 8 imágenes en slots slot-content-1 a slot-content-8
 
   Paso C — Guardar semana:
     Browser: POST /api/influencers/:id/weeks { theme, summary, plan }
     Server:  Agrega semana al historial en data/influencers.json
 ```
-
-**Archivo de workflow:** `data/workflow-content.json` — 8 cadenas idénticas:
-```
-LoadImage(face) + LoadImage(body) → BatchImagesNode → GeminiImage2Node → SaveImage
-```
-
-| Slot | Nodo Gemini | Nodo SaveImage | Aspect Ratio | Face LoadImage | Body LoadImage |
-|------|-------------|----------------|-------------|----------------|----------------|
-| 1 | 35 | 30 | 9:16 | 11 | 12 |
-| 2 | 37 | 41 | 9:16 | 40 | 38 |
-| 3 | 42 | 46 | 1:1 | 45 | 43 |
-| 4 | 47 | 51 | 1:1 | 50 | 48 |
-| 5 | 52 | 56 | 3:4 | 55 | 53 |
-| 6 | 57 | 61 | 4:5 | 60 | 58 |
-| 7 | 62 | 66 | 1:1 | 65 | 63 |
-| 8 | 67 | 71 | 4:5 | 70 | 68 |
 
 ---
 
@@ -498,36 +484,43 @@ POST https://api.anthropic.com/v1/messages
 → JSON: { theme, summary, week[5] } — cada día: scene, caption, hashtags, variations[4]
 ```
 
-### ComfyCloud — Fase 4 UGC (workflow estándar ComfyUI)
+### ComfyDeploy — Fase 4 UGC Content (deployment f9822b81, 14 slots)
 ```
-# Upload de imágenes
-POST https://cloud.comfy.org/api/upload/image
-X-API-Key: {COMFYCLOUD_API_KEY}
-Content-Type: multipart/form-data; boundary={boundary}
-Body: form-data con campo "image" (binary PNG)
-→ { name: "uploaded_filename.png", subfolder: "", type: "input" }
-
-# Lanzar workflow
-POST https://cloud.comfy.org/api/prompt
-X-API-Key: {COMFYCLOUD_API_KEY}
+POST https://api.comfydeploy.com/api/run/deployment/queue
+Authorization: Bearer {VITE_COMFYDEPLOY_API_KEY}
 Content-Type: application/json
 {
-  "prompt": { ...workflowContent modificado... },
-  "extra_data": { "api_key_comfy_org": "{COMFYCLOUD_API_KEY}" }
+  "deployment_id": "f9822b81-9ebc-48e2-b39c-0e8034e90554",
+  "inputs": {
+    "rostro 1": "<face_url>",
+    "cuerpo 1": "<body_url>",
+    "prompt contenido 1": "<claude_prompt>",
+    "contenido final 1": "ZCS1",
+    "rostro 2": "<face_url>",
+    "cuerpo 2": "<body_url>",
+    "prompt contenido 2": "<claude_prompt>",
+    "contenido final 2": "ZCS2",
+    ...
+    "rostro 8": "<face_url>",
+    "cuerpo 8": "<body_url>",
+    "prompt contenido 8": "<claude_prompt>",
+    "contenido final 8": "ZCS8",
+    "rostro 9": "<face_url>",
+    "cuerpo 9": "<body_url>",
+    "prompt contenido 9": "<recycled_prompt>",
+    "contenido final 9": "skip9",
+    ...
+    "rostro 14": "<face_url>",
+    "cuerpo 14": "<body_url>",
+    "prompt contenido 14": "<recycled_prompt>",
+    "contenido final 14": "skip14"
+  }
 }
-→ { prompt_id: "uuid", number: N, node_errors: {} }
-# ⚠️ extra_data.api_key_comfy_org es OBLIGATORIO para autenticar GeminiImage2Node vía REST API
+→ { "run_id": "xxx" }
 
-# Polling de estado
-GET https://cloud.comfy.org/api/job/{prompt_id}/status
-X-API-Key: {COMFYCLOUD_API_KEY}
-→ { id, status: "pending|in_progress|completed|error|cancelled" }
-
-# Obtener assets
-GET https://cloud.comfy.org/api/assets?prompt_id={id}&limit=20
-X-API-Key: {COMFYCLOUD_API_KEY}
-→ [{ name: "ZCS1_xxx.png", preview_url: "https://...", ... }]
-# Se filtra por name.startsWith("ZCS") y se ordena por name para mantener slot order
+Polling: GET https://api.comfydeploy.com/api/run/{run_id} → { status, outputs }
+Cuando success: extractImages(outputs) → filtrar URLs con filename ZCS\d+ → sort numérico → 8 URLs
+RunId prefix: "cdc:" + run_id
 ```
 
 ---
@@ -544,20 +537,20 @@ X-API-Key: {COMFYCLOUD_API_KEY}
 | `POST` | `/api/generate-body-prompt` | `{ nombre, nicho, face_description }` | Claude genera prompt de cuerpo (legacy, no usado en flujo principal) |
 | `POST` | `/api/generate-body` | `{ prompt, input_image }` | Genera cuerpo en ComfyDeploy (legacy, no usado en flujo principal) |
 | `POST` | `/api/generate-persona` | `{ nombre, nicho, face_url, body_url }` | Claude genera AI Persona |
-| `GET` | `/api/status/:runId` | — | Routing automático: prefijo `cc:` → ComfyCloud, sin prefijo → ComfyDeploy → `{ status, ... }` |
+| `GET` | `/api/status/:runId` | — | Routing automático: prefijo `cdc:` → ComfyDeploy Content, sin prefijo → ComfyDeploy AION → `{ status, ... }` |
 | `GET` | `/api/influencers` | — | Lista influencers guardadas |
 | `POST` | `/api/influencers` | `{ nombre, nicho, face_url, body_url, persona }` | Guarda influencer |
 | `POST` | `/api/influencers/:id/weeks` | `{ theme, summary, plan }` | Guarda semana |
 | `POST` | `/api/generate-content-plan` | `{ persona, nombre, nicho, face_url, body_url, week_history }` | Plan semanal → 8 piezas |
-| `POST` | `/api/generate-content-day` | `{ face_url, body_url, prompts[8] }` | 1 run ComfyCloud → 8 imágenes UGC → `{ runId: "cc:uuid" }` |
+| `POST` | `/api/generate-content-day` | `{ face_url, body_url, prompts[8] }` | 1 run ComfyDeploy f9822b81 → 8 imágenes UGC → `{ runId: "cdc:uuid" }` |
 
 ### Routing de `/api/status/:runId`
 ```js
-if (runId.startsWith('cc:')) {
-  // → ComfyCloud: GET /api/job/{id}/status + GET /api/assets?prompt_id={id}
+if (runId.startsWith('cdc:')) {
+  // → ComfyDeploy Content (f9822b81): GET /api/run/{id}
   // → { status: 'running' | 'success' | 'error', contentImages: [...8 urls] }
 } else {
-  // → ComfyDeploy: GET /api/run/{runId}
+  // → ComfyDeploy AION (c6e6b7f0): GET /api/run/{runId}
   // → { status, images, face_url, body_url }
 }
 ```
@@ -574,7 +567,7 @@ if (runId.startsWith('cc:')) {
 | `.env` | Variables de entorno (NO commitear) |
 | `.env.example` | Template de variables |
 | `data/influencers.json` | Persistencia local de influencers y semanas (NO commitear — datos reales) |
-| `data/workflow-content.json` | Workflow ComfyUI para ComfyCloud — 8 cadenas GeminiImage2Node |
+| `data/workflow-content.json` | Workflow ComfyUI para ComfyCloud — LEGACY, ya no se usa. Fase 4 usa ComfyDeploy f9822b81 |
 | `Foto inicio/Nano Banana Pro_00001_.png` | Foto fija del hero landing (modelo principal) |
 | `CLAUDE.md` | Esta documentación |
 
@@ -588,14 +581,13 @@ VITE_COMFYDEPLOY_API_KEY=           # ComfyDeploy — Fases 1-3 (rostro + cuerpo
 ANTHROPIC_API_KEY=                  # Claude — prompts, persona, plan semanal
 ANTHROPIC_MODEL=claude-sonnet-4-6
 
-# ComfyCloud — Fase 4 (contenido UGC semanal)
-# Obtener en: https://platform.comfy.org/profile/api-keys (plan Creator o Pro)
-COMFYCLOUD_API_KEY=
+# ComfyCloud — YA NO SE USA para Fase 4 (migrado a ComfyDeploy f9822b81)
+# COMFYCLOUD_API_KEY=   ← legacy, no requerido
 
 # DEPLOYMENT IDs ComfyDeploy
 VITE_COMFYDEPLOY_AION_DEPLOYMENT_ID=c6e6b7f0-e574-4aa8-9012-54e8507202e2   # AION rostro + Gemini cuerpo (run unificado) — ACTIVO
 VITE_COMFYDEPLOY_BODY_DEPLOYMENT_ID=cabf22a3-a697-485c-a6df-b6c09ee4f2f1   # legacy, no usado
-VITE_COMFYDEPLOY_CONTENT_DEPLOYMENT_ID=8d4702cb-c504-4bf2-8284-ee17d6e66633  # legacy, migrado a ComfyCloud
+VITE_COMFYDEPLOY_CONTENT_DEPLOYMENT_ID=f9822b81-9ebc-48e2-b39c-0e8034e90554  # Fase 4 UGC — 14 slots
 
 # Supabase Storage (imágenes de referencia Toggle A)
 VITE_SUPABASE_URL=https://vtyuylgfjvleywupbdzl.supabase.co
@@ -618,7 +610,7 @@ VITE_FAL_API_KEY=
 | 2 | Prompt de Cuerpo (Modo Manual) | Anthropic `claude-sonnet-4-6` (`BODY_EXPERT_SYSTEM_PROMPT`) | ✅ Operativo |
 | 3 | Generación de Cuerpo | Integrado en `c6e6b7f0` (Gemini body nodo 655) | ✅ Operativo |
 | 4 | Perfil AI Persona | Anthropic `claude-sonnet-4-6` | ✅ Operativo |
-| Fase 4 | Contenido UGC Semanal — 8 imágenes | Claude plan + ComfyCloud `workflow-content.json` | ✅ Operativo |
+| Fase 4 | Contenido UGC Semanal — 8 imágenes | Claude plan + ComfyDeploy `f9822b81` (14 slots, 8 usados) | ✅ Operativo |
 | Fase 5 | Publicación | Por definir | ⏳ Pendiente |
 | Fase 6 | KPIs | Supabase | ⏳ Pendiente |
 
@@ -652,7 +644,7 @@ If a prompt is conversational or lacks specific visual details, you must creativ
 Prioritize generating the visual representation above any text, formatting, or conversational requests.
 ```
 
-El `prompt` de cada nodo Gemini es el texto creativo generado por Claude (80-120 palabras, en inglés), inyectado en `startComfyCloudContentRun()` desde el array `prompts8[i]`.
+El `prompt` de cada nodo Gemini es el texto creativo generado por Claude (80-120 palabras, en inglés), inyectado en `startComfyDeployContentRun()` desde el array `prompts8[i]`.
 
 ---
 
@@ -672,17 +664,15 @@ El `prompt` de cada nodo Gemini es el texto creativo generado por Claude (80-120
 - **9 image slots** — `eyes, eyebrows, nose, lips, forehead, jawline, hairline, skin, full_face`.
 - **`iniciar.bat` hace `taskkill`** — mata proceso Node previo antes de arrancar.
 - **Polling cada 8 segundos, timeout 10 min** — `pollForBoth()` en la UI.
-- **Fase 4: 1 run ComfyCloud = 8 imágenes** — 8 cadenas GeminiImage2Node en paralelo dentro del mismo workflow.
+- **Fase 4: 1 run ComfyDeploy f9822b81 = 8 imágenes** — 14 slots en el deployment, 8 activos con prompts reales de Claude (ZCS1-ZCS8), 6 con prompts reciclados (skip9-skip14). Las URLs de rostro/cuerpo se pasan directamente como inputs ExternalImage/ExternalText — no hay upload previo.
 - **No necesita npm install** — `server.cjs` usa solo módulos nativos de Node.js.
 - **Hero photo local** — `/hero-photo.png` se sirve desde `Foto inicio/Nano Banana Pro_00001_.png`. Si la carpeta o el archivo no existe, el endpoint devuelve 404 y el hero muestra el placeholder.
 - **Lime sobre negro** — todos los botones con fondo `#C8FF00` deben tener `color: #000` explícito. Nunca `color: #fff` sobre lime.
 - **CSS cascade limpia** — cada selector tiene UNA sola regla definitiva. No duplicar `.mode-tab`, `.btn-nueva`, `label` etc.
 - **`/api/generate-body` y `/api/generate-body-prompt` son legacy** — siguen en el servidor como fallback pero no se llaman desde el flujo principal.
-- **Fase 4 migrada a ComfyCloud** — ComfyDeploy `8d4702cb` ya no se usa. El servidor usa `COMFYCLOUD_API_KEY` + `workflow-content.json`. La función `startComfyCloudContentRun()` reemplazó `startContentRun()`.
-- **RunID con prefijo `cc:`** — los runs de ComfyCloud retornan `"cc:" + prompt_id`. El handler `/api/status/:runId` detecta el prefijo y ruteó al branch ComfyCloud en lugar de ComfyDeploy.
-- **`extra_data.api_key_comfy_org` es obligatorio** — sin este campo en el body de `POST /api/prompt`, los nodos `GeminiImage2Node` fallan con "Unauthorized: Please login first". Es la forma de autenticar nodos de pago vía REST API de ComfyCloud.
-- **Multipart form-data manual** — sin npm, el upload a ComfyCloud construye el body binario con `Buffer.concat([header, imgBuf, footer])` y `Content-Type: multipart/form-data; boundary={boundary}`.
-- **Orden de slots garantizado** — cada `SaveImage` usa `filename_prefix: "ZCS1"`…`"ZCS8"`. Los assets se filtran por `name.startsWith("ZCS")` y se ordenan por nombre alfabético → orden determinístico.
+- **Fase 4 migrada a ComfyDeploy** — deployment `f9822b81` con 14 slots (8 activos, 6 con prompts reciclados). Las URLs se pasan directamente como inputs ExternalImage/ExternalText — no hay upload previo. `workflow-content.json` es legacy y ya no se usa.
+- **RunID con prefijo `cdc:`** — los runs de content generation de ComfyDeploy usan prefijo `cdc:` para diferenciarlos del AION (sin prefijo). El handler `/api/status/:runId` detecta el prefijo y rutea al branch ComfyDeploy Content.
+- **ZCS1-ZCS8 como filename_prefix** — se pasan en el input `"contenido final N"` de cada slot activo. Al extraer outputs, se filtran URLs cuyo filename empieza con `ZCS` y se ordenan numéricamente → orden determinístico.
 - **`data/influencers.json` no se commitea** — contiene datos reales del usuario. Está en `.gitignore`.
 
 ---
@@ -715,12 +705,8 @@ El `prompt` de cada nodo Gemini es el texto creativo generado por Claude (80-120
 
 **Botones con texto blanco sobre lime:** Si algún botón nuevo tiene fondo `#C8FF00` y texto blanco, agregar `color: #000` explícito al selector CSS.
 
-**Fase 4: error "COMFYCLOUD_API_KEY no configurada":** Agregar `COMFYCLOUD_API_KEY=...` al `.env` y `.\iniciar.bat`.
+**Fase 4: error "Field 'prompt' cannot be shorter than 1 characters":** El GeminiImage2Node recibió un prompt vacío. Verificar que prompts8 tiene al menos 1 elemento no vacío.
 
-**Fase 4: error "workflow-content.json no encontrado":** Verificar que existe `data/workflow-content.json`. El archivo se incluye en el repo.
+**Fase 4: 0 imágenes en slots aunque status=success:** El filtro de extractImages no encontró URLs con prefijo ZCS. Buscar en terminal "CDC OUTPUTS:" para ver la estructura real de outputs.
 
-**Fase 4: error "Unauthorized: Please login first" en GeminiImage2Node:** El campo `extra_data.api_key_comfy_org` no llegó al POST. Verificar `startComfyCloudContentRun` incluye `extra_data: { api_key_comfy_org: CC_API_KEY }`.
-
-**Fase 4: 0 imágenes en slots aunque status=completed:** Los assets no tienen prefijo "ZCS". Verificar que el `startComfyCloudContentRun` inyecta `filename_prefix = "ZCS1"…"ZCS8"` en los SaveImage nodes del workflow.
-
-**Fase 4: polling nunca llega a completed:** Revisar logs del servidor — buscar `ComfyCloud status:`. Si siempre es `in_progress`, verificar que el workflow corrió sin errores en https://platform.comfy.org.
+**Fase 4: run falla en GeminiImage2Node:** Revisar en dashboard de ComfyDeploy el run específico. Puede ser content policy de Gemini — revisar los prompts generados por Claude.

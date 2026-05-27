@@ -32,34 +32,22 @@ loadEnv()
 const API_KEY               = process.env.VITE_COMFYDEPLOY_API_KEY || ''
 const ANTHROPIC_KEY         = process.env.ANTHROPIC_API_KEY || ''
 const ANTHROPIC_MODEL       = process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-6'
-const CC_API_KEY            = process.env.COMFYCLOUD_API_KEY || ''
 const DEPLOYMENT_ID_AION    = process.env.VITE_COMFYDEPLOY_AION_DEPLOYMENT_ID || 'c6e6b7f0-e574-4aa8-9012-54e8507202e2'
 const DEPLOYMENT_ID_BODY    = process.env.VITE_COMFYDEPLOY_BODY_DEPLOYMENT_ID || 'cabf22a3-a697-485c-a6df-b6c09ee4f2f1'
-// DEPLOYMENT_ID_CONTENT (8d4702cb) eliminado — Fase 4 migrada a ComfyCloud (cloud.comfy.org)
+const DEPLOYMENT_ID_CONTENT = 'f9822b81-9ebc-48e2-b39c-0e8034e90554'  // Fase 4 UGC — ComfyDeploy (14 slots)
 const SUPABASE_URL          = process.env.VITE_SUPABASE_URL || ''
 const SUPABASE_KEY          = process.env.VITE_SUPABASE_ANON_KEY || ''
 const SUPABASE_BUCKET       = process.env.SUPABASE_BUCKET || 'zami-images'
 const PORT                  = 3333
 const HOST                  = '127.0.0.1'
 const CD_BASE               = 'api.comfydeploy.com'
-const CC_BASE               = 'cloud.comfy.org'
 const DATA_DIR              = path.join(__dirname, 'data')
 const INFLUENCERS_FILE      = path.join(DATA_DIR, 'influencers.json')
-const WORKFLOW_CONTENT_FILE = path.join(DATA_DIR, 'workflow-content.json')
 const MAX_JSON_BODY_BYTES   = 25 * 1024 * 1024
 const MAX_UPLOAD_BYTES      = 8 * 1024 * 1024
 const ALLOWED_IMAGE_TYPES   = new Set(['image/jpeg', 'image/png', 'image/webp'])
 const IMAGE_EXTENSIONS      = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' }
 let influencerWriteQueue    = Promise.resolve()
-
-// ── Load ComfyCloud content workflow ────────────────────────────────────────
-let workflowContent = null
-try {
-  workflowContent = JSON.parse(fs.readFileSync(WORKFLOW_CONTENT_FILE, 'utf8'))
-  console.log('[STARTUP] workflow-content.json cargado OK')
-} catch (e) {
-  console.warn('[STARTUP] workflow-content.json no encontrado — contenido UGC deshabilitado:', e.message)
-}
 
 // ── Influencers persistence ──────────────────────────────────────────────────
 function loadInfluencers() {
@@ -119,141 +107,45 @@ function cdRequest(method, cdPath, body) {
   })
 }
 
-// ── ComfyCloud helpers ───────────────────────────────────────────────────────
-function ccRequest(method, ccPath, body) {
-  return new Promise((resolve, reject) => {
-    const payload = body ? JSON.stringify(body) : null
-    const opts = {
-      hostname: CC_BASE,
-      path: ccPath,
-      method,
-      headers: {
-        'X-API-Key':    CC_API_KEY,
-        'Content-Type': 'application/json',
-        ...(payload ? { 'Content-Length': Buffer.byteLength(payload) } : {}),
-      },
-    }
-    const req = https.request(opts, res => {
-      let raw = ''
-      res.on('data', d => raw += d)
-      res.on('end', () => {
-        try { resolve({ status: res.statusCode, body: JSON.parse(raw) }) }
-        catch { resolve({ status: res.statusCode, body: raw }) }
-      })
-    })
-    req.on('error', reject)
-    if (payload) req.write(payload)
-    req.end()
-  })
-}
+// ── Content UGC generation → vía ComfyDeploy (deployment f9822b81, 14 slots) ─
+// prompts8: array de 8 strings. Slots 9-14 se envían vacíos (el workflow los necesita).
+// Devuelve 'cdc:{run_id}' — prefijo permite detectar branch correcto en /api/status.
+async function startComfyDeployContentRun(faceUrl, bodyUrl, prompts8) {
+  const inputs = {}
 
-// Descarga imagen desde URL pública (Supabase) y la sube a ComfyCloud como multipart.
-// Devuelve el filename asignado por ComfyCloud (usado en los nodos LoadImage).
-async function uploadImageToComfyCloud(imageUrl) {
-  // 1. Descargar imagen como buffer
-  const imgBuf = await new Promise((resolve, reject) => {
-    const proto = imageUrl.startsWith('https') ? https : require('http')
-    proto.get(imageUrl, r => {
-      const chunks = []
-      r.on('data', c => chunks.push(c))
-      r.on('end', () => resolve(Buffer.concat(chunks)))
-      r.on('error', reject)
-    })
-  })
+  // Slots 1-8: prompts reales de Claude + prefijo ZCS para identificar en outputs
+  for (let i = 1; i <= 8; i++) {
+    inputs[`rostro ${i}`]           = faceUrl
+    inputs[`cuerpo ${i}`]           = bodyUrl
+    inputs[`prompt contenido ${i}`] = String(prompts8[i - 1] || '')
+    inputs[`contenido final ${i}`]  = `ZCS${i}`
+  }
+  // Slots 9-14: el deployment los requiere — GeminiImage2Node exige prompt min_length=1.
+  // Reutilizamos los primeros prompts cíclicamente para evitar el error de validación.
+  for (let i = 9; i <= 14; i++) {
+    inputs[`rostro ${i}`]           = faceUrl
+    inputs[`cuerpo ${i}`]           = bodyUrl
+    inputs[`prompt contenido ${i}`] = String(prompts8[(i - 9) % prompts8.length] || 'Lifestyle editorial portrait of this influencer')
+    inputs[`contenido final ${i}`]  = `skip${i}`
+  }
 
-  // 2. Construir multipart/form-data manualmente (sin npm)
-  const boundary = '----CCBoundary' + Date.now() + Math.random().toString(36).slice(2)
-  const filename  = `zami_input_${Date.now()}.png`
-  const header    = Buffer.from(
-    `--${boundary}\r\nContent-Disposition: form-data; name="image"; filename="${filename}"\r\nContent-Type: image/png\r\n\r\n`
-  )
-  const footer    = Buffer.from(`\r\n--${boundary}--\r\n`)
-  const bodyBuf   = Buffer.concat([header, imgBuf, footer])
-
-  // 3. POST a ComfyCloud /api/upload/image
-  return new Promise((resolve, reject) => {
-    const opts = {
-      hostname: CC_BASE,
-      path:     '/api/upload/image',
-      method:   'POST',
-      headers: {
-        'X-API-Key':    CC_API_KEY,
-        'Content-Type': `multipart/form-data; boundary=${boundary}`,
-        'Content-Length': bodyBuf.length,
-      },
-    }
-    const req = https.request(opts, r => {
-      let raw = ''
-      r.on('data', d => raw += d)
-      r.on('end', () => {
-        try {
-          const data = JSON.parse(raw)
-          if (r.statusCode !== 200 && r.statusCode !== 201) {
-            return reject(new Error(`ComfyCloud upload ${r.statusCode}: ${raw}`))
-          }
-          resolve(data.name)
-        } catch (e) { reject(new Error(`ComfyCloud upload parse error: ${raw}`)) }
-      })
-    })
-    req.on('error', reject)
-    req.write(bodyBuf)
-    req.end()
-  })
-}
-
-// Lanza un run de contenido UGC en ComfyCloud.
-// prompts8: array de 8 strings (uno por slot / nodo Gemini).
-// Devuelve 'cc:{prompt_id}' — el prefijo permite detectar ComfyCloud en /api/status.
-async function startComfyCloudContentRun(faceUrl, bodyUrl, prompts8) {
-  if (!CC_API_KEY) throw new Error('COMFYCLOUD_API_KEY no configurada en .env')
-  if (!workflowContent) throw new Error('workflow-content.json no encontrado en data/')
-
-  // 1. Subir face y body a ComfyCloud en paralelo
-  console.log('  [CC] Subiendo imágenes a ComfyCloud...')
-  const [faceName, bodyName] = await Promise.all([
-    uploadImageToComfyCloud(faceUrl),
-    uploadImageToComfyCloud(bodyUrl),
-  ])
-  console.log(`  [CC] face→${faceName}  body→${bodyName}`)
-
-  // 2. Clonar workflow y hacer injecciones
-  const wf = JSON.parse(JSON.stringify(workflowContent))
-
-  // Inyectar filename de rostro en todos los LoadImage de imagen 1
-  const faceNodes = ['11','40','45','50','55','60','65','70']
-  faceNodes.forEach(id => { wf[id].inputs.image = faceName })
-
-  // Inyectar filename de cuerpo en todos los LoadImage de imagen 2
-  const bodyNodes = ['12','38','43','48','53','58','63','68']
-  bodyNodes.forEach(id => { wf[id].inputs.image = bodyName })
-
-  // Inyectar prompts en los 8 GeminiImage2Node (slots 1-8 en orden)
-  const geminiNodes = ['35','37','42','47','52','57','62','67']
-  geminiNodes.forEach((id, i) => {
-    wf[id].inputs.prompt = String(prompts8[i] || '')
-  })
-
-  // Poner filename_prefix único por slot → permite ordenar los assets al recibirlos
-  // SaveImage que corresponde a cada Gemini: 35→30, 37→41, 42→46, 47→51, 52→56, 57→61, 62→66, 67→71
-  const saveNodes = ['30','41','46','51','56','61','66','71']
-  saveNodes.forEach((id, i) => {
-    wf[id].inputs.filename_prefix = `ZCS${i + 1}`
-  })
-
-  // 3. Enviar a ComfyCloud
-  // extra_data.api_key_comfy_org es necesario para que los GeminiImage2Node
-  // puedan autenticarse internamente — sin esto lanza "Unauthorized: Please login first"
-  console.log('  [CC] Enviando workflow a ComfyCloud...')
-  const res = await ccRequest('POST', '/api/prompt', {
-    prompt: wf,
-    extra_data: { api_key_comfy_org: CC_API_KEY },
+  console.log('  [CD-CONTENT] Enviando a ComfyDeploy (14 slots, usando 8)...')
+  console.log('  [CD-CONTENT] inputs slot 1:', JSON.stringify({
+    'rostro 1':           inputs['rostro 1'],
+    'cuerpo 1':           inputs['cuerpo 1'],
+    'prompt contenido 1': inputs['prompt contenido 1'],
+    'contenido final 1':  inputs['contenido final 1'],
+  }, null, 2))
+  const res = await cdRequest('POST', '/api/run/deployment/queue', {
+    deployment_id: DEPLOYMENT_ID_CONTENT,
+    inputs,
   })
   if (res.status !== 200 && res.status !== 201) {
-    throw new Error(`ComfyCloud submit ${res.status}: ${JSON.stringify(res.body)}`)
+    throw new Error(`ComfyDeploy content ${res.status}: ${JSON.stringify(res.body)}`)
   }
-  const promptId = res.body.prompt_id
-  console.log(`  [CC] prompt_id: ${promptId}`)
-  return 'cc:' + promptId
+  const runId = res.body.run_id
+  console.log(`  [CD-CONTENT] run_id: ${runId}`)
+  return 'cdc:' + runId
 }
 
 // ── AION face generation ─────────────────────────────────────────────────────
@@ -557,7 +449,9 @@ REGLAS FOTOGRÁFICAS UGC (aplica en TODOS los prompts):
 - "Shot on iPhone 15 Pro" — NUNCA studio lights
 - Incluir imperfecciones reales: grain de sensor, ligero motion blur ocasional
 - Tipos: selfie | mirror selfie | POV candid | lifestyle moment
-- Siempre sexy y sugerente, SFW
+- Imágenes muy atractivas, magnéticas, cautivadoras y aspiracionales — siempre bella, alluring y captivating
+- Outfits reales según el nicho: streetwear, athleisure, vestidos, coordinated sets, loungewear
+- GEMINI SAFETY — OBLIGATORIO: NUNCA usar nude, naked, revealing, topless, sensual, erotic, explicit — Gemini bloqueará el request. Usar en cambio: alluring, captivating, magnetic, smoldering, confident, fierce, striking, body-hugging outfit, curve-accentuating
 - COHERENCIA NARRATIVA a lo largo de la semana
 - Prompts en INGLÉS, resto en ESPAÑOL
 
@@ -639,26 +533,29 @@ const BODY_PARAM_OPTIONS = {
   body_skin_reflection: ['matte natural skin','subtle natural sheen','soft dewy glow','satin skin finish'],
 }
 
-const BODY_EXPERT_SYSTEM_PROMPT = `You are a precision body prompt engineer for Gemini image generation. You receive 15 body parameters and output a single English prompt that controls ONLY the body in the generated image.
+const BODY_EXPERT_SYSTEM_PROMPT = `You are a precision body prompt engineer for Gemini image generation. You receive body parameters and output a single English prompt that controls the full-body image.
 
 MANDATORY VISUAL RULES — non-negotiable:
-- Pure white background (#FFFFFF), high-key shadowless studio lighting
-- Full body standing shot, head-to-toe, centered, straight-on or slight 3/4 angle
-- Outfit: white seamless bodysuit OR nude-tone form-fitting one-piece swimwear — zero accessories, zero patterns, zero textures. The outfit exists only to reveal body proportions.
+- Pure white background (#FFFFFF), seamless high-key studio lighting, zero shadows, zero context
+- Full body standing shot, head-to-toe, perfectly centered, straight-on or slight 3/4 angle
+- Outfit: white form-fitting leggings + white cropped athletic top — extremely body-hugging, accentuating every curve. No patterns, no accessories. The outfit exists only to reveal body proportions.
+- Hyperrealistic photography: 8K, sharp focus, ultra-detailed skin texture, RAW photo quality
 
 PROMPT CONSTRUCTION ORDER:
-1. Height and overall build (1 short sentence using height_build + body_type params)
-2. Upper body: shoulder width, bust size, waist definition (use exact params)
+0. ALWAYS open with: "Using the provided reference portrait as the exact face and identity, generate a hyperrealistic full-body photograph of this same woman. Preserve all facial features exactly as shown in the reference image."
+1. Height and overall build (1 sentence: height_build + body_type)
+2. Upper body: shoulder width, bust size, waist definition (exact params → anatomical descriptors)
 3. Lower body: waist_hip_ratio, hip width, glute shape, thigh shape, leg length, leg shape, calf shape
 4. Skin: body_skin_tone_match, body_skin_detail, body_skin_reflection
 
 STRICT RULES:
 - Translate each parameter into a concrete anatomical descriptor
-- NO face description, NO hair, NO background beyond white studio
+- NO face description beyond the opening reference directive, NO hair, NO background beyond pure white studio
 - NO scene, NO location, NO props
-- All influencers are beautiful, sexy, and aspirational — no exceptions
+- All influencers are strikingly alluring, magnetic, and aspirational — magazine editorial quality
 - 120–150 words MAX
-- Output ONLY the prompt text. No markdown, no labels, no explanations.`
+- Output ONLY the prompt text. No markdown, no labels, no explanations.
+- NEVER use: nude, naked, revealing, sensual, erotic, explicit — Gemini will block these`
 
 async function generateBodyPromptFromParams(nombre, nicho, bodyParams, bodyDescription) {
   const paramLines = Object.entries(BODY_PARAM_OPTIONS)
@@ -771,15 +668,15 @@ OUTPUT RULES:
 - Return ONLY a valid JSON object — no markdown, no code blocks, no explanation, no extra text
 - Include ALL 43 face parameters PLUS the "prompt_body" field (44 fields total)
 - Use ONLY the exact string values listed above for face params
-- "prompt_body": a 150–250 word English prompt for GPT Image 2 describing the full body. Follow this structure:
-  1. Subject: photorealistic full-body portrait of the woman
-  2. Body proportions inferred from her ethnicity/build + niche (fitness=athletic, gamer=soft curvy, fashion=hourglass, etc.)
-  3. Outfit: sexy, form-fitting, niche-appropriate (SFW) — NEVER plain or neutral
-  4. Pose: confident and sexy
-  5. Setting + lighting: cinematic, flattering
-  6. Technical: "full body shot, fashion photography, Sony A7R V, 35mm, 8K, photorealistic, ultra-detailed"
-  All influencers are beautiful and sexy. Skin tone of body must match face skin_tone param.
-- Example: {"sex":"female","ethnicity":"Latin American","eye_shape":"almond-shaped",...,"prompt_body":"A photorealistic full-body portrait..."}`
+- "prompt_body": a 150–250 word English prompt for Gemini image generation. MUST follow this structure EXACTLY:
+  1. ALWAYS start with: "Using the provided reference portrait as the exact face and identity, generate a hyperrealistic full-body photograph of this same woman. Preserve all facial features exactly as in the reference."
+  2. Body proportions inferred from ethnicity/build + niche (fitness=athletic/sculpted, gamer=soft curvy, fashion=hourglass, luxury=tall statuesque)
+  3. Outfit: white form-fitting leggings + white cropped athletic top, extremely body-hugging — accentuates every curve. Elegant and aspirational.
+  4. Pose: confident, commanding, alluring — magazine editorial quality
+  5. Setting: pure white seamless background (#FFFFFF), high-key studio lighting, zero shadows
+  6. Technical: "full body shot, fashion photography, Sony A7R V, 35mm lens, 8K, hyperrealistic, ultra-detailed, RAW photo"
+  Skin tone of body must match face skin_tone param. NEVER use: nude, naked, revealing, sensual, erotic, sexy — use instead: alluring, captivating, magnetic, aspirational, striking.
+- Example: {"sex":"female","ethnicity":"Latin American","eye_shape":"almond-shaped",...,"prompt_body":"Using the provided reference portrait as the exact face and identity, generate a hyperrealistic full-body photograph of this same woman..."}`
 
 async function generateAionParams(description, referenceImages, photoType, nombre, nicho) {
   const content = []
@@ -1311,7 +1208,7 @@ const server = http.createServer(async (req, res) => {
       }
 
       console.log(`\n[CONTENT-RUN] slots=8 face=${faceUrl.split('/').pop()} body=${bodyUrl.split('/').pop()}`)
-      const runId = await startComfyCloudContentRun(faceUrl, bodyUrl, prompts)
+      const runId = await startComfyDeployContentRun(faceUrl, bodyUrl, prompts)
       console.log(`  run: ${runId}`)
 
       json(res, 200, { runId })
@@ -1328,31 +1225,33 @@ const server = http.createServer(async (req, res) => {
     try {
       const runId = decodeURIComponent(statusMatch[1])
 
-      // ── ComfyCloud run (prefijo cc:) ──────────────────────────────────────
-      if (runId.startsWith('cc:')) {
-        const promptId = runId.slice(3)
-        const stRes = await ccRequest('GET', `/api/job/${promptId}/status`, null)
-        const st    = (stRes.body && stRes.body.status) ? stRes.body.status : ''
-        console.log(`[CC-STATUS] ${promptId} -> ${st}`)
+      // ── ComfyDeploy Content run (prefijo cdc:) ───────────────────────────
+      if (runId.startsWith('cdc:')) {
+        const cdcId = runId.slice(4)
+        const data  = await getRun(cdcId)
+        const st    = data.status || ''
+        console.log(`[CDC-STATUS] ${cdcId} -> ${st}`)
 
-        if (st === 'error' || st === 'cancelled') {
+        if (st === 'success') {
+          console.log('CDC OUTPUTS:', JSON.stringify(data.outputs, null, 2))
+          const images = extractImages(data.outputs)
+          // Filtrar solo los ZCS1-ZCS8 (skip9-skip14 se excluyen automáticamente)
+          const contentImages = images
+            .filter(u => /\/ZCS\d+[_]/.test(u) || /[?&]file=ZCS\d+/.test(u) || u.split('/').pop().startsWith('ZCS'))
+            .sort((a, b) => {
+              const aNum = parseInt(a.split('/').pop().match(/ZCS(\d+)/)?.[1] || '0')
+              const bNum = parseInt(b.split('/').pop().match(/ZCS(\d+)/)?.[1] || '0')
+              return aNum - bNum
+            })
+          console.log(`  [CDC] contentImages: ${contentImages.length}`, contentImages.map(u => u.split('/').pop()))
+          return json(res, 200, { status: 'success', contentImages })
+        }
+        if (['failed', 'cancelled', 'timeout'].includes(st)) {
+          console.log(`[CDC-ERROR] ${cdcId} -> ${st}`)
+          console.log(`[CDC-ERROR] full response:`, JSON.stringify(data, null, 2))
           return json(res, 200, { status: 'error', message: st })
         }
-        if (st !== 'completed') {
-          return json(res, 200, { status: 'running' })
-        }
-
-        // Completado: obtener assets ordenados por slot (ZCS1–ZCS8)
-        const assetsRes = await ccRequest('GET', `/api/assets?prompt_id=${promptId}&limit=20`, null)
-        const assets    = Array.isArray(assetsRes.body) ? assetsRes.body
-                          : (assetsRes.body && Array.isArray(assetsRes.body.items)) ? assetsRes.body.items
-                          : []
-        const contentImages = assets
-          .filter(a => a.name && a.name.startsWith('ZCS'))
-          .sort((a, b) => a.name.localeCompare(b.name))
-          .map(a => a.preview_url)
-        console.log(`  [CC] contentImages: ${contentImages.length}`, contentImages.map(u => (u || '').split('/').pop()))
-        return json(res, 200, { status: 'success', contentImages })
+        return json(res, 200, { status: 'running' })
       }
 
       // ── ComfyDeploy run (sin prefijo) ────────────────────────────────────
@@ -1408,7 +1307,7 @@ server.listen(PORT, HOST, () => {
     console.log(`   Anthropic:   ${ANTHROPIC_KEY ? ANTHROPIC_KEY.slice(0, 8) + '...' : 'NO CONFIGURADA'}`)
     console.log(`   Modelo:      ${ANTHROPIC_MODEL}`)
     console.log(`   AION deploy: ${DEPLOYMENT_ID_AION}`)
-    console.log(`   ComfyCloud:  ${CC_API_KEY ? CC_API_KEY.slice(0, 8) + '...' : 'NO CONFIGURADA'} (Fase 4 UGC)`)
+    console.log(`   Content deploy: ${DEPLOYMENT_ID_CONTENT}`)
     console.log(`   Supabase:    ${SUPABASE_URL || 'NO CONFIGURADA'} / bucket: ${SUPABASE_BUCKET}`)
     console.log(`   Influencers: ${db.influencers.length} guardadas`)
     console.log()
