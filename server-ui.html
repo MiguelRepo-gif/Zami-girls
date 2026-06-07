@@ -325,11 +325,96 @@
   .sx-step-done     { background: rgba(74,222,128,0.12); color: #4ade80; border: 1px solid #4ade80 }
   .sx-step-error    { background: rgba(248,113,113,0.12); color: #f87171; border: 1px solid #f87171 }
   .sx-sep { color: #333; display: flex; align-items: center; padding: 0 4px; font-size: 0.7rem }
-  .btn-generate-week { margin-top: 18px; width: 100%; padding: 13px; font-size: 0.95rem; background: #C8FF00; color: #000; border-radius: 12px; letter-spacing: 0.02em; flex: unset }
-  .btn-save-week { margin-top: 10px; flex: unset; padding: 9px 20px; background: #4ade8033; border: 1px solid #4ade8066; color: #4ade80; font-size: 0.82rem; border-radius: 10px; width: 100% }
-  .btn-save-week:hover:not(:disabled) { background: #4ade8055 }
-  .btn-retry-content { margin-top: 10px; flex: unset; padding: 9px 20px; background: #f8717133; border: 1px solid #f8717166; color: #f87171; font-size: 0.82rem; border-radius: 10px; width: 100% }
-  .btn-retry-content:hover:not(:disabled) { background: #f8717155 }
+
+  /* ── 2-Week Content Calendar ─────────────────────────────── */
+  .calendar-grid { display: grid; grid-template-columns: repeat(4, 1fr) !important; gap: 12px; margin-top: 0 }
+
+  @keyframes shimmer {
+    0%   { background-position: -600px 0 }
+    100% { background-position:  600px 0 }
+  }
+  .slot-skeleton {
+    background: linear-gradient(90deg, #1a1a1a 25%, #252525 50%, #1a1a1a 75%);
+    background-size: 600px 100%;
+    animation: shimmer 1.4s infinite linear;
+    min-height: 100px; border-radius: 0 0 6px 6px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .slot-skeleton-label { font-size: 0.65rem; color: #444; letter-spacing: 0.04em; text-transform: uppercase }
+
+  .week-section { margin-top: 20px }
+  .week-header-bar {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 16px; background: #111; border-radius: 12px 12px 0 0;
+    border: 1px solid #2a2a2a; border-bottom: none;
+  }
+  .week-num-badge {
+    font-family: 'Bebas Neue', sans-serif; font-size: 0.95rem; letter-spacing: 0.08em;
+    background: rgba(200,255,0,0.13); border: 1px solid rgba(200,255,0,0.27);
+    color: #C8FF00; padding: 2px 10px; border-radius: 20px; white-space: nowrap;
+  }
+  .week-theme-label {
+    font-size: 0.82rem; font-weight: 700; color: #ddd; flex: 1;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .week-status-badge {
+    font-size: 0.68rem; font-weight: 700; padding: 2px 10px; border-radius: 20px;
+    text-transform: uppercase; letter-spacing: 0.05em; white-space: nowrap;
+  }
+  .wsb-pending    { background: #1a1a1a; color: #555; border: 1px solid #2a2a2a }
+  .wsb-planning   { background: rgba(200,255,0,0.12); color: #C8FF00; border: 1px solid #C8FF00; animation: pulse-badge .9s ease-in-out infinite }
+  .wsb-generating { background: rgba(200,255,0,0.12); color: #C8FF00; border: 1px solid #C8FF00; animation: pulse-badge .9s ease-in-out infinite }
+  .wsb-done       { background: rgba(74,222,128,0.12); color: #4ade80; border: 1px solid #4ade80 }
+  .wsb-error      { background: rgba(248,113,113,0.12); color: #f87171; border: 1px solid #f87171 }
+  .week-elapsed   { font-size: 0.68rem; color: #555; min-width: 32px; text-align: right }
+  @keyframes pulse-badge { 0%,100% { opacity:1 } 50% { opacity:.5 } }
+
+  .week-grid-wrap {
+    border: 1px solid #2a2a2a; border-top: none;
+    border-radius: 0 0 12px 12px; padding: 14px;
+    background: #0d0d0d;
+  }
+  .week-save-bar { display: flex; gap: 10px; margin-top: 12px; align-items: center }
+  .btn-save-week2 {
+    flex: unset; padding: 7px 16px; background: #4ade8033; border: 1px solid #4ade8066;
+    color: #4ade80; font-size: 0.8rem; border-radius: 10px;
+  }
+  .btn-save-week2:hover:not(:disabled) { background: #4ade8055 }
+  .week-save-status { font-size: 0.75rem; color: #666 }
+
+  @keyframes img-appear {
+    from { opacity: 0; transform: scale(0.97) }
+    to   { opacity: 1; transform: scale(1) }
+  }
+  .slot-img-appear { animation: img-appear .3s ease-out forwards }
+
+  .variation-image-slot .img-overlay {
+    position: absolute; inset: 0;
+    background: linear-gradient(to top, rgba(0,0,0,.75) 0%, transparent 55%);
+    opacity: 0; transition: opacity .2s; pointer-events: none; border-radius: inherit;
+  }
+  .variation-image-slot:hover .img-overlay { opacity: 1 }
+  .variation-image-slot .img-caption-preview {
+    position: absolute; bottom: 28px; left: 6px; right: 6px;
+    font-size: 0.6rem; color: #eee; line-height: 1.4; opacity: 0; transition: opacity .2s;
+    pointer-events: none; text-shadow: 0 1px 3px #000;
+    overflow: hidden; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical;
+  }
+  .variation-image-slot:hover .img-caption-preview { opacity: 1 }
+
+  .toast-container {
+    position: fixed; bottom: 24px; right: 24px; z-index: 9999;
+    display: flex; flex-direction: column; gap: 8px; pointer-events: none;
+  }
+  .toast {
+    padding: 10px 18px; border-radius: 10px; font-size: 0.82rem; font-weight: 600;
+    box-shadow: 0 4px 20px rgba(0,0,0,.5); pointer-events: auto;
+    animation: toast-in .25s ease-out; max-width: 320px;
+  }
+  @keyframes toast-in { from { opacity:0; transform:translateY(10px) } to { opacity:1; transform:translateY(0) } }
+  .toast-success { background: #161616; border: 1px solid #4ade80; color: #4ade80 }
+  .toast-error   { background: #161616; border: 1px solid #f87171; color: #f87171 }
+  .toast-info    { background: #161616; border: 1px solid #C8FF00; color: #C8FF00 }
   /* ── Mode Tabs ─────── (moved; dead rules removed) ─────── */
 
   /* ── Mode Tabs ───────────────────────────────────────── */
@@ -911,23 +996,44 @@
       </div>
     </div>
     <div class="row" style="margin-top:0">
-      <button id="btn-generate-plan" onclick="generateContentPlan()" disabled>Generar Plan Semanal</button>
+      <button id="btn-generate-plan" onclick="generateContent2Weeks()" disabled>✦ Generar 2 Semanas de Contenido</button>
     </div>
   </div>
 
   <div class="status-bar" id="content-plan-status">Completa el pipeline o selecciona una influencer guardada.</div>
 
-  <div id="content-calendar-wrap" style="display:none">
-    <div class="calendar-grid" id="content-calendar"></div>
-    <button class="btn-generate-week" id="btn-generate-week" onclick="generateWeekImages()" style="display:none">
-      Generar 8 Imágenes
-    </button>
-    <button class="btn-save-week" id="btn-save-week" onclick="saveWeek()" style="display:none">
-      Guardar semana en historial
-    </button>
-    <button class="btn-retry-content" id="btn-retry-content" onclick="retryContentImages()" style="display:none">
-      Recuperar imágenes (run activo)
-    </button>
+  <!-- Semana 1 -->
+  <div class="week-section" id="week-section-1" style="display:none">
+    <div class="week-header-bar">
+      <span class="week-num-badge">Semana 1</span>
+      <span class="week-theme-label" id="week-theme-1">Diseñando plan...</span>
+      <span class="week-status-badge wsb-pending" id="week-status-1">Pendiente</span>
+      <span class="week-elapsed" id="week-elapsed-1"></span>
+    </div>
+    <div class="week-grid-wrap">
+      <div class="calendar-grid" id="week-calendar-1"></div>
+      <div class="week-save-bar">
+        <button class="btn-save-week2" id="btn-save-week-1" onclick="saveWeekData(1)" style="display:none">Guardar Semana 1</button>
+        <span class="week-save-status" id="week-save-status-1"></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Semana 2 -->
+  <div class="week-section" id="week-section-2" style="display:none">
+    <div class="week-header-bar">
+      <span class="week-num-badge">Semana 2</span>
+      <span class="week-theme-label" id="week-theme-2">Esperando Semana 1...</span>
+      <span class="week-status-badge wsb-pending" id="week-status-2">Pendiente</span>
+      <span class="week-elapsed" id="week-elapsed-2"></span>
+    </div>
+    <div class="week-grid-wrap">
+      <div class="calendar-grid" id="week-calendar-2"></div>
+      <div class="week-save-bar">
+        <button class="btn-save-week2" id="btn-save-week-2" onclick="saveWeekData(2)" style="display:none">Guardar Semana 2</button>
+        <span class="week-save-status" id="week-save-status-2"></span>
+      </div>
+    </div>
   </div>
 
   <!-- Panel de resultados sexy — se muestra al hacer clic en "✦ Más Sexy" -->
@@ -966,6 +1072,8 @@
 
   </div><!-- end workspace -->
 </div><!-- end container -->
+
+<div class="toast-container" id="toast-container"></div>
 
 <script>
 const POLL_INTERVAL = 8000
@@ -1051,9 +1159,14 @@ let selectedInfluencer    = null
 let generatedFaceUrl      = null
 let generatedBodyUrl      = null
 let generatedPersonaText  = null
-let currentContentPlan    = null
-let lastContentRunId      = null   // guardado para poder recuperar imágenes si hay timeout
-let lastSexyContentRunId   = null
+let currentContentPlan    = null   // kept for backwards compat
+let lastContentRunId      = null
+let lastSexyContentRunId  = null
+let currentContentPlan1   = null
+let currentContentPlan2   = null
+let lastContentRunId1     = null
+let lastContentRunId2     = null
+const _weekTimers         = {}
 
 // Toggle state
 const sectionState = { images: false, params: false, body: false, prompt: false }
@@ -1570,7 +1683,7 @@ function selectInfluencer(btn) {
   syncPhase4Thumbs()
   document.getElementById('p4-influencer-label').textContent = `${inf.nombre} · ${inf.nicho} · ${inf.weeks?.length || 0} semanas generadas`
   document.getElementById('btn-generate-plan').disabled = false
-  setContentPlanStatus('Influencer cargada. Clic en "Generar Plan Semanal" para comenzar.')
+  setContentPlanStatus('Influencer cargada. Clic en "✦ Generar 2 Semanas de Contenido" para comenzar.')
   renderInfluencersPanel(getCachedInfluencers())
   document.getElementById('content-plan-status').scrollIntoView({ behavior: 'smooth', block: 'start' })
 }
@@ -1594,7 +1707,8 @@ function showNewInfluencerFlow() {
   document.getElementById('save-influencer-row').style.display = 'none'
   document.getElementById('copy-wrap').style.display = 'none'
   document.getElementById('btn-generate-plan').disabled = true
-  document.getElementById('content-calendar-wrap').style.display = 'none'
+  document.getElementById('week-section-1').style.display = 'none'
+  document.getElementById('week-section-2').style.display = 'none'
   document.getElementById('sexy-result-section').style.display = 'none'
   setContentPlanStatus('Completa el pipeline o selecciona una influencer guardada.')
 
@@ -1902,54 +2016,87 @@ function syncPhase4Thumbs() {
   }
 }
 
-async function generateContentPlan() {
-  const nombre      = selectedInfluencer?.nombre || document.getElementById('nombre').value.trim()
-  const nicho       = selectedInfluencer?.nicho  || document.getElementById('nicho').value.trim()
-  const weekHistory = selectedInfluencer?.weeks?.map(w => ({ theme: w.theme, summary: w.summary })) || []
-  const btn         = document.getElementById('btn-generate-plan')
+// ── Toast ──────────────────────────────────────────────────────────────────
+function showToast(msg, type = 'info', durationMs = 4000) {
+  const container = document.getElementById('toast-container')
+  if (!container) return
+  const el = document.createElement('div')
+  el.className = `toast toast-${type}`
+  el.textContent = msg
+  container.appendChild(el)
+  setTimeout(() => {
+    el.style.transition = 'opacity .3s'
+    el.style.opacity = '0'
+    setTimeout(() => el.remove(), 320)
+  }, durationMs)
+}
 
-  if (!generatedPersonaText) { setContentPlanStatus('Genera el perfil completo primero.', 'error'); return }
+// ── Week status helpers ────────────────────────────────────────────────────
+function setWeekStatus(weekNum, state, theme = '') {
+  const badge = document.getElementById(`week-status-${weekNum}`)
+  const themeEl = document.getElementById(`week-theme-${weekNum}`)
+  if (!badge) return
+  const labels = { pending: 'Pendiente', planning: 'Planificando...', generating: 'Generando...', done: 'Listo', error: 'Error' }
+  badge.className = `week-status-badge wsb-${state}`
+  badge.textContent = labels[state] || state
+  if (theme && themeEl) themeEl.textContent = theme
+}
 
-  btn.disabled = true
-  document.getElementById('content-calendar-wrap').style.display = 'none'
-  setContentPlanStatus('Claude está diseñando la semana de contenido... ~45 segundos.')
+function startWeekTimer(weekNum) {
+  const start = Date.now()
+  const el = document.getElementById(`week-elapsed-${weekNum}`)
+  if (_weekTimers[weekNum]) clearInterval(_weekTimers[weekNum])
+  _weekTimers[weekNum] = setInterval(() => {
+    const s = Math.floor((Date.now() - start) / 1000)
+    if (el) el.textContent = `${s}s`
+  }, 1000)
+}
 
-  try {
-    generatedPersonaText = getCurrentPersonaText()
-    const res = await fetch('/api/generate-content-plan', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ persona: generatedPersonaText, nombre, nicho, face_url: generatedFaceUrl || '', body_url: generatedBodyUrl || '', week_history: weekHistory }),
-    })
-    const data = await res.json()
-    if (!res.ok || data.error) throw new Error(data.error || `HTTP ${res.status}`)
+function stopWeekTimer(weekNum) {
+  if (_weekTimers[weekNum]) { clearInterval(_weekTimers[weekNum]); _weekTimers[weekNum] = null }
+}
 
-    currentContentPlan = data.plan
-    lastSexyContentRunId = null
-    renderCalendar(data.plan)
-    setContentPlanStatus(`Plan generado: "${data.plan.theme}"`, 'success')
-    setSexyContentStatus('Plan normal listo. Ahora puedes generar el plan sexy con el mismo tema.')
-  } catch (err) {
-    setContentPlanStatus(`Error: ${err.message}`, 'error')
-  } finally {
-    btn.disabled = false
+// ── Skeleton slots ─────────────────────────────────────────────────────────
+function showSkeletonSlots(weekNum) {
+  const cal = document.getElementById(`week-calendar-${weekNum}`)
+  if (!cal) return
+  cal.innerHTML = ''
+  for (let s = 1; s <= 8; s++) {
+    const card = document.createElement('div')
+    card.className = 'day-card'
+    card.innerHTML = `
+      <div class="day-card-header">
+        <span class="day-name" style="color:#333">Slot ${s}</span>
+        <span class="post-type-badge" style="background:#1a1a1a;color:#333;border:1px solid #2a2a2a">—</span>
+      </div>
+      <div class="day-card-body" style="padding:8px">
+        <div class="slot-skeleton" style="min-height:32px;border-radius:6px;margin-bottom:6px">
+          <span class="slot-skeleton-label">Planificando</span>
+        </div>
+        <div class="slot-skeleton" style="min-height:16px;border-radius:6px;width:60%;margin-bottom:8px"></div>
+        <div class="variation-image-slot" id="slot-w${weekNum}-${s}" style="min-height:90px">
+          <div class="slot-skeleton" style="width:100%;min-height:90px">
+            <span class="slot-skeleton-label">Generando</span>
+          </div>
+        </div>
+      </div>`
+    cal.appendChild(card)
   }
 }
 
-function renderCalendar(plan) {
-  const cal = document.getElementById('content-calendar')
+// ── Render week calendar (replaces skeleton with real plan cards) ──────────
+function renderWeekCalendar(weekNum, plan) {
+  const cal = document.getElementById(`week-calendar-${weekNum}`)
+  if (!cal) return
   cal.innerHTML = ''
-  for (const dayData of plan.week) cal.appendChild(makeDayCard(dayData))
-  document.getElementById('content-calendar-wrap').style.display = 'block'
-  document.getElementById('btn-generate-week').style.display = 'block'
-  document.getElementById('btn-save-week').style.display = 'none'
-  cal.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  for (const slotData of plan.week) cal.appendChild(makeWeekDayCard(slotData, weekNum))
+  setWeekStatus(weekNum, 'generating', plan.theme)
 }
 
-function makeDayCard(slotData) {
-  const formatBg = { '9:16': '#7c3aed', '4:5': '#C8FF00', '3:4': '#d97706', '1:1': '#0ea5e9' }
+function makeWeekDayCard(slotData, weekNum) {
+  const formatBg    = { '9:16': '#7c3aed', '4:5': '#C8FF00', '3:4': '#d97706', '1:1': '#0ea5e9' }
   const formatColor = slotData.format === '4:5' ? '#000' : '#fff'
-  const bg = formatBg[slotData.format] || '#444'
+  const bg          = formatBg[slotData.format] || '#444'
 
   const el = document.createElement('div')
   el.className = 'day-card'
@@ -1963,17 +2110,18 @@ function makeDayCard(slotData) {
       </span>
     </div>
     <div class="day-card-body">
-      <div class="day-scene" contenteditable="true" id="scene-content-${slotData.slot}" style="display:none">${escHtml(slotData.scene || '')}</div>
-      <div class="day-caption" contenteditable="true" id="caption-content-${slotData.slot}">${escHtml(slotData.caption || '')}</div>
+      <div class="day-caption" contenteditable="true" id="caption-w${weekNum}-${slotData.slot}">${escHtml(slotData.caption || '')}</div>
       <div class="variation-list">
         <div class="variation-item">
           <div class="variation-header" style="justify-content:space-between">
             <span class="shot-type-tag">Slot ${slotData.slot}</span>
-            <button onclick="this.closest('.variation-item').querySelector('.variation-prompt').style.display=this.closest('.variation-item').querySelector('.variation-prompt').style.display==='none'?'block':'none';this.textContent=this.closest('.variation-item').querySelector('.variation-prompt').style.display==='none'?'ver prompt ▾':'ocultar ▴'" style="background:none;border:none;color:#555;font-size:0.62rem;cursor:pointer;padding:0 4px">ver prompt ▾</button>
+            <button onclick="const vp=this.closest('.variation-item').querySelector('.variation-prompt');vp.style.display=vp.style.display==='none'?'block':'none';this.textContent=vp.style.display==='none'?'ver prompt ▾':'ocultar ▴'" style="background:none;border:none;color:#555;font-size:0.62rem;cursor:pointer;padding:0 4px">ver prompt ▾</button>
           </div>
-          <div class="variation-prompt" contenteditable="true" id="prompt-content-${slotData.slot}" style="display:none">${escHtml(slotData.prompt || '')}</div>
-          <div class="variation-image-slot" id="slot-content-${slotData.slot}">
-            <div class="slot-placeholder">Sin imagen</div>
+          <div class="variation-prompt" contenteditable="true" id="prompt-w${weekNum}-${slotData.slot}" style="display:none">${escHtml(slotData.prompt || '')}</div>
+          <div class="variation-image-slot" id="slot-w${weekNum}-${slotData.slot}">
+            <div class="slot-skeleton" style="width:100%;min-height:90px">
+              <span class="slot-skeleton-label">Generando</span>
+            </div>
           </div>
         </div>
       </div>
@@ -1981,87 +2129,52 @@ function makeDayCard(slotData) {
   return el
 }
 
-async function generateWeekImages() {
-  if (!currentContentPlan) return
-  const btn = document.getElementById('btn-generate-week')
-  btn.disabled = true
-  btn.textContent = 'Generando... (puede tardar varios minutos)'
-  document.getElementById('btn-save-week').style.display = 'none'
-
-  // Poner spinners en los 8 slots
-  for (let s = 1; s <= 8; s++) {
-    const slot = document.getElementById(`slot-content-${s}`)
-    if (slot) slot.innerHTML = '<div class="slot-spinner"></div>'
-  }
-
-  // Recolectar los 8 prompts desde los campos editables
-  const prompts = []
-  for (let s = 1; s <= 8; s++) {
-    const el = document.getElementById(`prompt-content-${s}`)
-    prompts.push(el ? el.innerText.trim() : (currentContentPlan.week[s - 1]?.prompt || ''))
-  }
-
-  document.getElementById('btn-retry-content').style.display = 'none'
-  setContentPlanStatus('Lanzando run de contenido — 8 imágenes en paralelo...')
-
-  try {
-    const res = await fetch('/api/generate-content-day', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ face_url: generatedFaceUrl, body_url: generatedBodyUrl, prompts }),
-    })
-    const data = await res.json()
-    if (!res.ok || data.error) throw new Error(data.error || `HTTP ${res.status}`)
-
-    lastContentRunId = data.runId
-    await pollContentRun(data.runId)
-    setContentPlanStatus('8 imágenes generadas. Semana lista.', 'success')
-    document.getElementById('btn-save-week').style.display = 'block'
-  } catch (err) {
-    // Los slots ya fueron actualizados por pollContentRun — solo actualizar status bar
-    // (excepto en errores pre-polling donde pollContentRun no llegó a correr)
-    if (!err.isPollingError) {
-      for (let s = 1; s <= 8; s++) {
-        const slot = document.getElementById(`slot-content-${s}`)
-        if (slot) slot.innerHTML = `<div class="slot-placeholder" style="color:#f87171">Error: ${escHtml(err.message)}</div>`
-      }
-    }
-    setContentPlanStatus(`Error: ${err.message}`, 'error')
-  } finally {
-    btn.disabled = false
-    btn.textContent = 'Generar 8 Imágenes'
-  }
-}
-
-function renderContentImages(imgs) {
+// ── Render week images (called when ComfyDeploy run completes) ─────────────
+function renderWeekImages(imgs, weekNum) {
   const all = (imgs || []).slice(0, 8)
   for (let i = 0; i < 8; i++) {
-    const slotEl = document.getElementById(`slot-content-${i + 1}`)
+    const slotEl = document.getElementById(`slot-w${weekNum}-${i + 1}`)
     const imgUrl = all[i]
+    const caption = document.getElementById(`caption-w${weekNum}-${i + 1}`)?.innerText || ''
     if (slotEl && imgUrl) {
-      slotEl.textContent = ''
+      slotEl.innerHTML = ''
       const img = document.createElement('img')
       img.src = imgUrl
-      img.alt = `Slot ${i + 1}`
+      img.alt = `Semana ${weekNum} Slot ${i + 1}`
+      img.className = 'slot-img-appear'
+      img.style.cssText = 'width:100%;aspect-ratio:4/5;object-fit:cover;display:block;cursor:pointer'
       img.addEventListener('click', () => window.open(imgUrl, '_blank'))
+
+      const overlay = document.createElement('div')
+      overlay.className = 'img-overlay'
+
+      const captionEl = document.createElement('div')
+      captionEl.className = 'img-caption-preview'
+      captionEl.textContent = caption
+
       const dlBtn = document.createElement('button')
       dlBtn.className = 'btn-download'
       dlBtn.textContent = 'Descargar'
-      dlBtn.addEventListener('click', () => downloadImage(imgUrl, `slot${i + 1}.jpg`))
+      dlBtn.addEventListener('click', (e) => { e.stopPropagation(); downloadImage(imgUrl, `s${weekNum}-slot${i + 1}.jpg`) })
+
       const sexyBtn = document.createElement('button')
       sexyBtn.className = 'btn-mas-sexy'
       sexyBtn.textContent = '✦ Más Sexy'
       sexyBtn.addEventListener('click', (e) => { e.stopPropagation(); generateSexyFromContent(imgUrl) })
+
       slotEl.appendChild(img)
+      slotEl.appendChild(overlay)
+      slotEl.appendChild(captionEl)
       slotEl.appendChild(dlBtn)
       slotEl.appendChild(sexyBtn)
     } else if (slotEl) {
-      slotEl.innerHTML = '<div class="slot-placeholder" style="color:#888">Sin imagen</div>'
+      slotEl.innerHTML = '<div class="slot-placeholder" style="color:#555">Sin imagen</div>'
     }
   }
 }
 
-async function pollContentRun(runId, deadline = Date.now() + 1_200_000) {
+// ── Poll a single week's ComfyDeploy run ──────────────────────────────────
+async function pollWeekContentRun(runId, weekNum, deadline = Date.now() + 1_200_000) {
   while (Date.now() < deadline) {
     await sleep(POLL_INTERVAL)
     try {
@@ -2069,64 +2182,161 @@ async function pollContentRun(runId, deadline = Date.now() + 1_200_000) {
       const data = await res.json()
 
       if (data.status === 'success') {
-        renderContentImages(data.contentImages)
+        renderWeekImages(data.contentImages, weekNum)
         return
       }
 
       if (data.status === 'error') {
-        for (let i = 0; i < 8; i++) {
-          const slotEl = document.getElementById(`slot-content-${i + 1}`)
+        for (let i = 1; i <= 8; i++) {
+          const slotEl = document.getElementById(`slot-w${weekNum}-${i}`)
           if (slotEl) slotEl.innerHTML = `<div class="slot-placeholder" style="color:#f87171">${escHtml(data.message || 'error')}</div>`
         }
-        const err = new Error(data.message || 'ComfyCloud error')
+        const err = new Error(data.message || 'ComfyDeploy error')
         err.isPollingError = true
         throw err
       }
     } catch (err) {
       if (err.isPollingError) throw err
-      console.warn('poll content error:', err.message)
+      console.warn(`poll week${weekNum} error:`, err.message)
     }
   }
 
-  // Timeout: intentar un fetch final por si el job terminó justo ahora
+  // Timeout: intentar un fetch final
   try {
     const tRes  = await fetch(`/api/status/${runId}`)
     const tData = await tRes.json()
     if (tData.status === 'success' && tData.contentImages?.length) {
-      renderContentImages(tData.contentImages)
+      renderWeekImages(tData.contentImages, weekNum)
       return
     }
   } catch {}
 
-  // Run sigue activo o tardó más de 20 min — mostrar botón de recuperación
-  for (let i = 0; i < 8; i++) {
-    const slotEl = document.getElementById(`slot-content-${i + 1}`)
-    if (slotEl) slotEl.innerHTML = '<div class="slot-placeholder" style="color:#f87171">Timeout — usa "Recuperar imágenes"</div>'
+  for (let i = 1; i <= 8; i++) {
+    const slotEl = document.getElementById(`slot-w${weekNum}-${i}`)
+    if (slotEl) slotEl.innerHTML = '<div class="slot-placeholder" style="color:#f87171">Timeout</div>'
   }
-  document.getElementById('btn-retry-content').style.display = 'block'
-  const err = new Error('Timeout generando imágenes de contenido')
+  const err = new Error(`Timeout generando imágenes semana ${weekNum}`)
   err.isPollingError = true
   throw err
 }
 
-async function retryContentImages() {
-  if (!lastContentRunId) return
-  const btn = document.getElementById('btn-retry-content')
+// ── Main: generate 2 weeks sequentially ───────────────────────────────────
+async function generateContent2Weeks() {
+  const nombre = selectedInfluencer?.nombre || document.getElementById('nombre').value.trim()
+  const nicho  = selectedInfluencer?.nicho  || document.getElementById('nicho').value.trim()
+  const weekHistory = selectedInfluencer?.weeks?.map(w => ({ theme: w.theme, summary: w.summary })) || []
+  const btn    = document.getElementById('btn-generate-plan')
+
+  if (!generatedPersonaText) { setContentPlanStatus('Genera el perfil completo primero.', 'error'); return }
+
   btn.disabled = true
-  btn.textContent = 'Recuperando...'
-  for (let s = 1; s <= 8; s++) {
-    const slot = document.getElementById(`slot-content-${s}`)
-    if (slot) slot.innerHTML = '<div class="slot-spinner"></div>'
-  }
+  generatedPersonaText = getCurrentPersonaText()
+
+  // Show both week sections with skeleton
+  ;[1, 2].forEach(wn => {
+    const sec = document.getElementById(`week-section-${wn}`)
+    if (sec) sec.style.display = 'block'
+    showSkeletonSlots(wn)
+    setWeekStatus(wn, 'pending', wn === 1 ? 'Diseñando plan...' : 'Esperando Semana 1...')
+    document.getElementById(`btn-save-week-${wn}`).style.display = 'none'
+    document.getElementById(`week-save-status-${wn}`).textContent = ''
+    document.getElementById(`week-elapsed-${wn}`).textContent = ''
+  })
+
+  document.getElementById('week-section-1').scrollIntoView({ behavior: 'smooth', block: 'start' })
+  setContentPlanStatus('Generando 2 semanas de contenido...')
+
+  currentContentPlan1 = null; currentContentPlan2 = null
+  lastContentRunId1   = null; lastContentRunId2   = null
+
+  // ── Week 1: plan + run ─────────────────────────────────────────────────
   try {
-    await pollContentRun(lastContentRunId, Date.now() + 1_200_000)
-    setContentPlanStatus('Imágenes recuperadas. Semana lista.', 'success')
-    document.getElementById('btn-save-week').style.display = 'block'
-    btn.style.display = 'none'
-  } catch (err) {
-    setContentPlanStatus(`Error: ${err.message}`, 'error')
+    setWeekStatus(1, 'planning', 'Diseñando plan...')
+    startWeekTimer(1)
+
+    const r1 = await fetch('/api/generate-content-plan', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ persona: generatedPersonaText, nombre, nicho, face_url: generatedFaceUrl || '', body_url: generatedBodyUrl || '', week_history: weekHistory }),
+    })
+    const d1 = await r1.json()
+    if (!r1.ok || d1.error) throw new Error(d1.error || `HTTP ${r1.status}`)
+
+    currentContentPlan = d1.plan
+    currentContentPlan1 = d1.plan
+    renderWeekCalendar(1, d1.plan)
+
+    const prompts1 = d1.plan.week.map(w => w.prompt || '')
+    const cr1 = await fetch('/api/generate-content-day', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ face_url: generatedFaceUrl, body_url: generatedBodyUrl, prompts: prompts1 }),
+    })
+    const cd1 = await cr1.json()
+    if (!cr1.ok || cd1.error) throw new Error(cd1.error || `HTTP ${cr1.status}`)
+    lastContentRunId1 = cd1.runId
+    lastContentRunId  = cd1.runId
+
+    // ── Week 2: plan (sequential so it knows week 1 theme) ─────────────
+    setWeekStatus(2, 'planning', 'Diseñando plan Semana 2...')
+    startWeekTimer(2)
+    const extHistory = [...weekHistory, { theme: d1.plan.theme, summary: d1.plan.summary || '' }]
+
+    const r2 = await fetch('/api/generate-content-plan', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ persona: generatedPersonaText, nombre, nicho, face_url: generatedFaceUrl || '', body_url: generatedBodyUrl || '', week_history: extHistory }),
+    })
+    const d2 = await r2.json()
+    if (!r2.ok || d2.error) throw new Error(d2.error || `HTTP ${r2.status}`)
+
+    currentContentPlan2 = d2.plan
+    renderWeekCalendar(2, d2.plan)
+
+    const prompts2 = d2.plan.week.map(w => w.prompt || '')
+    const cr2 = await fetch('/api/generate-content-day', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ face_url: generatedFaceUrl, body_url: generatedBodyUrl, prompts: prompts2 }),
+    })
+    const cd2 = await cr2.json()
+    if (!cr2.ok || cd2.error) throw new Error(cd2.error || `HTTP ${cr2.status}`)
+    lastContentRunId2 = cd2.runId
+
+    setContentPlanStatus('Planes generados. Imágenes en progreso...', 'success')
     btn.disabled = false
-    btn.textContent = 'Recuperar imágenes (run activo)'
+
+    // ── Poll both weeks concurrently ───────────────────────────────────
+    const poll1 = pollWeekContentRun(cd1.runId, 1).then(() => {
+      stopWeekTimer(1)
+      setWeekStatus(1, 'done', d1.plan.theme)
+      document.getElementById('btn-save-week-1').style.display = 'block'
+      showToast('Semana 1 lista — 8 imágenes generadas', 'success')
+    }).catch(err => {
+      stopWeekTimer(1)
+      setWeekStatus(1, 'error')
+      showToast(`Semana 1 error: ${err.message}`, 'error')
+    })
+
+    const poll2 = pollWeekContentRun(cd2.runId, 2).then(() => {
+      stopWeekTimer(2)
+      setWeekStatus(2, 'done', d2.plan.theme)
+      document.getElementById('btn-save-week-2').style.display = 'block'
+      showToast('Semana 2 lista — 8 imágenes generadas', 'success')
+    }).catch(err => {
+      stopWeekTimer(2)
+      setWeekStatus(2, 'error')
+      showToast(`Semana 2 error: ${err.message}`, 'error')
+    })
+
+    await Promise.allSettled([poll1, poll2])
+    setContentPlanStatus('Generación completa — 16 imágenes listas.', 'success')
+
+  } catch (err) {
+    btn.disabled = false
+    stopWeekTimer(1); stopWeekTimer(2)
+    setContentPlanStatus(`Error: ${err.message}`, 'error')
+    showToast(err.message, 'error')
   }
 }
 
@@ -2306,37 +2516,38 @@ async function pollSexyContentRun(runId, deadline = Date.now() + 1_200_000) {
 }
 
 
-async function saveWeek() {
+async function saveWeekData(weekNum) {
   if (!selectedInfluencer) {
-    setContentPlanStatus('Guarda la influencer primero para poder guardar semanas.', 'error')
+    showToast('Guarda la influencer primero.', 'error')
     return
   }
-  if (!currentContentPlan) {
-    setContentPlanStatus('Genera un plan de contenido primero.', 'error')
-    return
-  }
+  const plan = weekNum === 1 ? currentContentPlan1 : currentContentPlan2
+  if (!plan) { showToast('Plan no disponible.', 'error'); return }
 
-  const btn = document.getElementById('btn-save-week')
-  btn.disabled = true
+  const btn       = document.getElementById(`btn-save-week-${weekNum}`)
+  const statusEl  = document.getElementById(`week-save-status-${weekNum}`)
+  btn.disabled    = true
   btn.textContent = 'Guardando...'
 
   try {
     const res = await fetch(`/api/influencers/${selectedInfluencer.id}/weeks`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ theme: currentContentPlan.theme, summary: currentContentPlan.summary || '', plan: currentContentPlan }),
+      body: JSON.stringify({ theme: plan.theme, summary: plan.summary || '', plan }),
     })
     const data = await res.json()
     if (!res.ok || data.error) throw new Error(data.error || `HTTP ${res.status}`)
 
-    selectedInfluencer.weeks = [...(selectedInfluencer.weeks || []), { week_id: data.week_id, theme: currentContentPlan.theme, summary: currentContentPlan.summary }]
+    selectedInfluencer.weeks = [...(selectedInfluencer.weeks || []), { week_id: data.week_id, theme: plan.theme, summary: plan.summary }]
     await loadInfluencers()
-    btn.textContent = 'Semana guardada'
-    setContentPlanStatus(`Semana "${currentContentPlan.theme}" guardada en el historial.`, 'success')
+    btn.textContent      = '✓ Guardada'
+    if (statusEl) statusEl.textContent = `"${plan.theme}" en historial`
+    showToast(`Semana ${weekNum} guardada`, 'success')
   } catch (err) {
-    setContentPlanStatus(`Error al guardar: ${err.message}`, 'error')
-    btn.disabled = false
-    btn.textContent = 'Guardar semana en historial'
+    if (statusEl) statusEl.textContent = `Error: ${err.message}`
+    btn.disabled    = false
+    btn.textContent = `Guardar Semana ${weekNum}`
+    showToast(`Error al guardar: ${err.message}`, 'error')
   }
 }
 

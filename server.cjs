@@ -1416,6 +1416,48 @@ const server = http.createServer(async (req, res) => {
     return
   }
 
+  // POST /api/generate-content-2weeks — Plan + Run para 2 semanas en secuencia
+  if (req.method === 'POST' && pathname === '/api/generate-content-2weeks') {
+    try {
+      const body        = await readBody(req)
+      const persona     = (body.persona  || '').trim()
+      const nombre      = (body.nombre   || '').trim()
+      const nicho       = (body.nicho    || '').trim()
+      const faceUrl     = (body.face_url || '').trim()
+      const bodyUrl     = (body.body_url || '').trim()
+      const weekHistory = body.week_history || []
+
+      if (!persona) { json(res, 400, { error: 'persona requerido' }); return }
+      if (!nombre)  { json(res, 400, { error: 'nombre requerido' }); return }
+      if (!nicho)   { json(res, 400, { error: 'nicho requerido' }); return }
+      if (!ANTHROPIC_KEY) { json(res, 500, { error: 'Agrega ANTHROPIC_API_KEY en tu .env' }); return }
+
+      console.log(`\n[CONTENT-2WEEKS] nombre="${nombre}" nicho="${nicho}" historial=${weekHistory.length}`)
+
+      const plan1 = await generateContentPlan(nombre, nicho, persona, faceUrl, bodyUrl, weekHistory)
+      console.log(`  Semana 1 plan: theme="${plan1.theme}"`)
+      const prompts1 = plan1.week.map(w => w.prompt || '')
+      const runId1   = await startComfyDeployContentRun(faceUrl, bodyUrl, prompts1)
+      console.log(`  Semana 1 run: ${runId1}`)
+
+      const extendedHistory = [...weekHistory, { theme: plan1.theme, summary: plan1.summary || '' }]
+      const plan2 = await generateContentPlan(nombre, nicho, persona, faceUrl, bodyUrl, extendedHistory)
+      console.log(`  Semana 2 plan: theme="${plan2.theme}"`)
+      const prompts2 = plan2.week.map(w => w.prompt || '')
+      const runId2   = await startComfyDeployContentRun(faceUrl, bodyUrl, prompts2)
+      console.log(`  Semana 2 run: ${runId2}`)
+
+      json(res, 200, {
+        week1: { plan: plan1, runId: runId1 },
+        week2: { plan: plan2, runId: runId2 },
+      })
+    } catch (err) {
+      console.error('[CONTENT-2WEEKS ERROR]', err.message)
+      fail(res, err)
+    }
+    return
+  }
+
   // POST /api/generate-sexy-from-content — ComfyUI Cloud (ccsx:) con contexto
   if (req.method === 'POST' && pathname === '/api/generate-sexy-from-content') {
     try {
