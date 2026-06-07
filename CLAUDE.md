@@ -657,6 +657,8 @@ VITE_FAL_API_KEY=
 | 3 | Generación de Cuerpo | Integrado en `e833a575` (AionBodyReferenceNode nodo 227) | ✅ Operativo |
 | 4 | Perfil AI Persona | Anthropic `claude-sonnet-4-6` | ✅ Operativo |
 | Fase 4 | Contenido UGC Semanal — 8 imágenes | Claude plan + ComfyDeploy `f9822b81` (14 slots, 8 usados) | ✅ Operativo |
+| Fase 4B | Contenido Sexy (flujo viejo) — eliminado de UI | ComfyDeploy `5eb42961` — roto, reemplazado por Fase 4C | 🗑 Eliminado del UI |
+| Fase 4C | Botón "✦ Más Sexy" por foto — 10 imágenes | ComfyUI Cloud `cloud.comfy.org` + `data/workflow-sexy-contexto.json` (versión 7-6) | ✅ Operativo |
 | Fase 5 | Publicación | Por definir | ⏳ Pendiente |
 | Fase 6 | KPIs | Supabase | ⏳ Pendiente |
 
@@ -759,3 +761,260 @@ El `prompt` de cada nodo Gemini es el texto creativo generado por Claude (80-120
 **Fase 4: 0 imágenes en slots aunque status=success:** El filtro de extractImages no encontró URLs con prefijo ZCS. Buscar en terminal "CDC OUTPUTS:" para ver la estructura real de outputs.
 
 **Fase 4: run falla en GeminiImage2Node:** Revisar en dashboard de ComfyDeploy el run específico. Puede ser content policy de Gemini — revisar los prompts generados por Claude.
+---
+
+## FASE 4B - CONTENIDO UGC SEXY (COMFYDEPLOY SEEDREAM)
+
+Estado: ⚠️ Deployment `5eb42961-a9dd-47c1-9c94-ad927f951943` falla en 0ms en ComfyDeploy ("Machine AION's Machine"). El run se crea pero falla antes de ejecutar ningún nodo. Causa probable: la máquina del deployment no tiene instalados los custom nodes (ByteDanceSeedreamNodeV2, ClaudeNode, RegexReplace, etc.). Ver Fase 4C para el nuevo flujo de reemplazo.
+Workflow fuente: C:\Users\LENOVO\Desktop\Downloads\Contenido sexy API.json
+Motor: ComfyDeploy deployment con ByteDanceSeedreamNodeV2, 2 imagenes externas y 10 outputs numerados (ZSEXY1-ZSEXY10).
+Separacion de motores: contenido normal usa VITE_COMFYDEPLOY_CONTENT_DEPLOYMENT_ID; contenido sexy usa VITE_COMFYDEPLOY_SEXY_CONTENT_DEPLOYMENT_ID.
+
+### Deployment activo
+
+El ID `5eb42961-a9dd-47c1-9c94-ad927f951943` está hardcodeado como default en `server.cjs` y en `.env.example`. No requiere variable de entorno para funcionar.
+
+Si quieres forzarlo explícitamente vía `.env`:
+
+```env
+VITE_COMFYDEPLOY_SEXY_CONTENT_DEPLOYMENT_ID=5eb42961-a9dd-47c1-9c94-ad927f951943
+```
+
+Luego reiniciar:
+
+```powershell
+cd C:\Users\LENOVO\zami-ai-studio-dev
+.\iniciar.bat
+```
+
+### Flujo en la app
+
+1. Generar o seleccionar influencer con face_url, body_url y AI Persona.
+2. Generar primero el Plan Semanal normal para fijar tema y continuidad.
+3. Clic en Generar Plan Sexy.
+4. La app llama:
+   - POST /api/generate-sexy-content-plan
+   - POST /api/generate-sexy-content-day
+   - GET /api/status/cdsx:{run_id}
+
+### Payload hacia ComfyDeploy sexy
+
+El servidor construye este payload para el deployment sexy:
+
+```json
+{
+  "rostro": "<face_url>",
+  "cuerpo": "<body_url>",
+  "ZSEXY1": "ZSEXY1",
+  "ZSEXY2": "ZSEXY2",
+  "ZSEXY3": "ZSEXY3",
+  "ZSEXY4": "ZSEXY4",
+  "ZSEXY5": "ZSEXY5",
+  "ZSEXY6": "ZSEXY6",
+  "ZSEXY7": "ZSEXY7",
+  "ZSEXY8": "ZSEXY8",
+  "ZSEXY9": "ZSEXY9",
+  "ZSEXY10": "ZSEXY10"
+}
+```
+
+### Arquitectura del workflow (confirmada con Contenido sexy API.json)
+
+**Inputs externos (ComfyUIDeployExternalImage/Text):**
+- `rostro` (nodo 719) — face_url
+- `cuerpo` (nodo 720) — body_url
+- `ZSEXY1`–`ZSEXY10` (nodos 727-736) — SaveImage prefixes, default values iguales al input_id
+
+**Pipeline interno:**
+1. **Nodo 649** (ClaudeNode "Unified Image Analysis") — analiza rostro+cuerpo y genera FACE_IDENTITY, BODY_REFERENCE, CHARACTER_LOCK, SEXY_INSTAGRAM_STYLE
+2. **Nodo 608** (ByteDanceSeedreamNodeV2) — genera imagen base usando rostro+cuerpo+prompt del análisis. Se guarda como `ZSEXY_base` (nodo 667)
+3. **Nodo 676** (ClaudeNode "Anthropic Claude") — recibe la imagen base + análisis, genera 10 prompts separados por `*`
+4. **Nodo 678** (StringSplitList) — divide los 10 prompts del string
+5. **Nodos 679–688** (ListGetItem index 0–9) — extrae cada prompt
+6. **Nodos 689, 692, 694, 700, 703, 706, 708, 712, 715, 718** (ByteDanceSeedreamNodeV2 × 10) — genera cada imagen final usando imagen base + su prompt
+7. **Nodos 695–716** (SaveImage × 10) — guarda con prefijo ZSEXY1–ZSEXY10
+
+**Filtro correcto en server.cjs:** `/^ZSEXY\d+/.test(filename)` — excluye `ZSEXY_base`, solo pasa `ZSEXY1`–`ZSEXY10`.
+
+La app filtra outputs por filename `/^ZSEXY\d+/`, ordena numericamente y renderiza 10 imagenes.
+
+### Reglas de prompting sexy
+
+El plan sexy usa prompts Instagram sexy, no desnudos y no explicitos.
+
+Prohibido en prompts:
+
+- nude
+- naked
+- topless
+- explicit
+- pornographic
+- nipples
+- genitalia
+- sex act
+
+Permitido/esperado:
+
+- Shot on iPhone 15 Pro
+- sexy Instagram influencer UGC
+- body-conscious outfit
+- high-cut bikini
+- micro crop top
+- body-hugging mini dress
+- mirror selfie
+- from behind looking over shoulder
+- natural phone grain
+- candid social media realism
+
+### Validacion del workflow antes de subir
+
+- links debe ser array de arrays, no objetos.
+- No deben quedar links huerfanos.
+- No deben quedar prompts activos con Analyze all 5 images, PANTS, TOP, SHOES, ENVIRONMENT.
+- No deben quedar dependencias activas de model/jeans/top/shoes/enviroment.
+- El workflow debe recibir rostro y cuerpo como external inputs.
+- Los outputs deben salir por SaveImage, no por external output nodes.
+
+### Troubleshooting sexy
+
+Si /api/generate-sexy-content-day dice que falta deployment: pegar VITE_COMFYDEPLOY_SEXY_CONTENT_DEPLOYMENT_ID en .env y reiniciar con .\iniciar.bat.
+
+Si status success pero no aparecen imagenes sexy: revisar terminal y buscar CD-SEXY OUTPUTS. El workflow genera tambien `ZSEXY_base` — el filtro `/^ZSEXY\d+/` lo excluye correctamente. Si aparecen 11 imagenes en vez de 10, el filtro no funciona.
+
+Si ComfyDeploy rechaza el workflow por schema: revisar que el JSON tenga links como arrays:
+
+```json
+[848, 721, 0, 689, 0, "STRING"]
+```
+
+No debe tener objetos tipo:
+
+```json
+{ "value": [848, 721, 0, 689, 0, "STRING"], "Count": 6 }
+```
+
+---
+
+## FASE 4C — BOTÓN "✦ MÁS SEXY" (COMFYUI CLOUD API)
+
+Estado: ✅ Operativo. Workflow versión 7-6 activo. UI con panel de resultados estático + steps de progreso animados.
+
+**Concepto:** Cada foto generada en el contenido UGC normal tiene un botón "✦ Más Sexy". Al hacer clic, esa foto se usa como `contexto` (IMAGE_3) del workflow, junto con `rostro` y `cuerpo` del influencer activo. El workflow genera 10 imágenes de la influencer en el MISMO lugar que la foto seleccionada, con poses progresivamente más sexys.
+
+### Motor: ComfyUI Cloud API (cloud.comfy.org)
+
+No usa ComfyDeploy. Llama directamente a la API de cloud.comfy.org con el workflow JSON modificado dinámicamente.
+
+**API Key:** `COMFYCLOUD_API_KEY` en `.env` — formato `comfyui-...`. Generar en https://platform.comfy.org/profile/api-keys
+
+**Workflow activo:** `data/workflow-sexy-contexto.json` — versión `ZAMI_SEXY_ROSTRO_CUERPO_NO BORRAR-API_ULTIMA VERSION 7-6.json`
+Nodos clave: 785 (ClaudeNode análisis 3 imágenes) → 789 (RegexReplace) → 676 (ClaudeNode 10 prompts) → 10×ByteDanceSeedreamNodeV2 → SaveImage ZSEXY1-ZSEXY10
+
+### Arquitectura del workflow (API format — ComfyUI prompt)
+
+Es un JSON plano con node IDs como claves (formato `/api/prompt` de ComfyUI):
+
+- **Node 727** (LoadImage): rostro — se parchea dinámicamente antes de enviar
+- **Node 728** (LoadImage): cuerpo — se parchea dinámicamente
+- **Node 729** (LoadImage): contexto (ubicación) — se parchea dinámicamente
+- **Node 649** (ClaudeNode "Unified Image Analysis"): recibe los 3 images → genera FACE_IDENTITY + BODY_REFERENCE + CHARACTER_LOCK + CONTEXT_LOCK + SEXY_INSTAGRAM_STYLE + [POSE_PROMPT]
+- **Node 658** (RegexReplace): reemplaza `[POSE_PROMPT]` en la salida de 649 con el texto del nodo 661
+- **Node 661** (PrimitiveStringMultiline "Prompt 1"): texto estático del pose base para la imagen establecedora
+- **Node 660** (PrimitiveStringMultiline "Prompt Template"): pasa la salida de 649 al RegexReplace
+- **Node 608** (ByteDanceSeedreamNodeV2): genera imagen base (ZSEXY_base) con los 3 inputs de imagen + prompt procesado
+- **Node 676** (ClaudeNode): recibe imagen base + análisis → genera 10 prompts separados por `*`, TODOS en el mismo contexto/ubicación
+- **Node 678** (StringSplitList): divide los 10 prompts
+- **Nodes 679-688** (ListGetItem 0-9): extrae cada prompt
+- **Nodes 689, 692, 694, 700, 703, 706, 708, 712, 715, 718** (ByteDanceSeedreamNodeV2 × 10): genera ZSEXY1-ZSEXY10
+- **Nodes 695-716** (SaveImage × 10): guarda con prefijos ZSEXY1-ZSEXY10
+
+### Prompts reescritos en esta sesión (nodos 649, 661, 676)
+
+**Node 649** — Analiza 3 imágenes y genera 6 secciones: FACE_IDENTITY, BODY_REFERENCE, CHARACTER_LOCK, CONTEXT_LOCK (nuevo — analiza IMAGE_3 como la ubicación física donde se tomarán TODAS las fotos), SEXY_INSTAGRAM_STYLE, POSE PROMPT IMAGE con placeholder `[POSE_PROMPT]`.
+
+**Node 661** — Prompt del pose base: instruye a Seedream a colocar a la influencer en el MISMO lugar que IMAGE_3 para la foto establecedora.
+
+**Node 676** — Genera 10 prompts TODOS en la MISMA ubicación (CONTEXT_LOCK). Estructura: Prompt 1 = 3/4 facing, P2 = from behind, P3 = selfie, P4 = low angle, P5 = from behind (diferente interacción), P6 = 3/4 forward, P7 = candid action, P8 = from behind máximo, P9 = crop cintura-muslo, P10 = sentada/reclinada. Outfit: 1 familia para las 10 fotos. Progresión de provocación 1→10.
+
+### Flujo server.cjs (nuevas funciones)
+
+```
+Botón "✦ Más Sexy" (en cada foto de contenido normal):
+  Browser: click → generateSexyFromContent(imgUrl)
+           POST /api/generate-sexy-from-content {
+             face_url: generatedFaceUrl,
+             body_url: generatedBodyUrl,
+             contexto_url: imgUrl (la foto seleccionada)
+           }
+  Server:  startComfyCloudSexyRun(faceUrl, bodyUrl, contextoUrl)
+           1. uploadToComfyCloud(faceUrl) → rostroName
+           2. uploadToComfyCloud(bodyUrl) → cuerpoName
+           3. uploadToComfyCloud(contextoUrl) → contextoName
+              (descarga imagen de su URL → sube a cloud.comfy.org multipart → devuelve filename)
+           4. Deep clone WORKFLOW_SEXY_CONTEXTO
+           5. workflow['727']['inputs']['image'] = rostroName
+              workflow['728']['inputs']['image'] = cuerpoName
+              workflow['729']['inputs']['image'] = contextoName
+           6. POST https://cloud.comfy.org/api/prompt
+              { prompt: workflow, extra_data: { api_key_comfy_org: COMFYCLOUD_API_KEY } }
+              Header: X-API-Key: COMFYCLOUD_API_KEY
+           7. Devuelve { runId: 'ccsx:' + prompt_id }
+  Browser: polling GET /api/status/ccsx:{prompt_id} cada 8s
+  Server:  GET https://cloud.comfy.org/api/job/{id}/status → { status }
+           Cuando completed:
+             GET https://cloud.comfy.org/api/jobs/{id} → { outputs: { nodeId: { images: [...] } } }
+             Filtrar outputs con filename /^ZSEXY\d+/ → ordenar numéricamente
+             Para cada filename: GET /api/view?filename=...&type=output (redirect: manual)
+               → Location header = URL pública firmada temporal (S3)
+             Devuelve { status: 'success', sexyImages: [10 URLs] }
+  Browser: renderSexyImages(sexyImages) — reutiliza función existente
+```
+
+### Variables de entorno nuevas
+
+```env
+COMFYCLOUD_API_KEY=comfyui-<key-activa>   # Generar en https://platform.comfy.org/profile/api-keys
+```
+
+### Archivos modificados en esta sesión
+
+| Archivo | Cambio |
+|---|---|
+| `data/workflow-sexy-contexto.json` | Nuevo — copia del workflow API para ComfyUI Cloud |
+| `server.cjs` | `COMFYCLOUD_API_KEY`, `WORKFLOW_SEXY_CONTEXTO` (carga JSON), `uploadToComfyCloud()`, `startComfyCloudSexyRun()`, endpoint `/api/generate-sexy-from-content`, branch `ccsx:` en `/api/status/:runId` |
+| `server-ui.html` | CSS `.btn-mas-sexy`, botón "✦ Más Sexy" en `renderContentImages()`, función `generateSexyFromContent()` |
+| `.env.example` | Documentada nueva variable `COMFYCLOUD_API_KEY` |
+| `ZAMI_SEXY_ROSTRO_CUERPO_NO BORRAR.json` (Desktop) | Reescritos nodos 649 (system_prompt con CONTEXT_LOCK), 661 (pose base con IMAGE_3), 676 (10 prompts mismo contexto) |
+
+### Troubleshooting Fase 4C
+
+**`[CC-SEXY ERROR] Agrega COMFYCLOUD_API_KEY en tu .env`:** La variable no está en `.env`. Agregar `COMFYCLOUD_API_KEY=comfyui-...` y reiniciar con `.\iniciar.bat`.
+
+**`[CC-SEXY ERROR] No se encontró data/workflow-sexy-contexto.json`:** El archivo no se copió al proyecto. Copiar `ZAMI_SEXY_ROSTRO_CUERPO_NO BORRAR (1).json` desde Desktop/Workflow a `data/workflow-sexy-contexto.json`.
+
+**`ComfyCloud upload 401`:** API key inválida o expirada. Regenerar en https://platform.comfy.org/profile/api-keys.
+
+**`ComfyCloud prompt 402`:** Sin créditos en cloud.comfy.org. Recargar créditos.
+
+**`[CC-SEXY-STATUS] ... -> completed` pero 0 sexyImages:** Los outputs no tienen filenames con prefijo `ZSEXY\d+`. Revisar en terminal `CC-SEXY OUTPUTS:` para ver la estructura real. Puede ser que el workflow en cloud.comfy.org cambió los prefijos.
+
+**Contenido UGC (Fase 4) da 404 "Workflow not found":** El `VITE_COMFYDEPLOY_CONTENT_DEPLOYMENT_ID` en `.env` apunta a un deployment eliminado. Cambiarlo a `f9822b81-9ebc-48e2-b39c-0e8034e90554` y reiniciar.
+
+### ESTADO AL CIERRE DE SESIÓN (2026-06-07)
+
+**Hecho en esta sesión:**
+- ✅ Workflow actualizado a versión 7-6 (`data/workflow-sexy-contexto.json`) — nodos 785+789+791+676+10×Seedream
+- ✅ COMFYCLOUD_API_KEY actualizada con key activa
+- ✅ Flujo `ccsx:` funcionando correctamente (ComfyUI Cloud genera ZSEXY1-ZSEXY10)
+- ✅ Eliminada sección "CONTENIDO SEXY INSTAGRAM" del UI (era redundante)
+- ✅ Eliminados endpoints legacy `/api/generate-sexy-content-plan` y `/api/generate-sexy-content-day`
+- ✅ Eliminada función `startComfyDeploySexyContentRun` y `generateSexyContentPlan` del servidor
+- ✅ Agregado panel `#sexy-result-section` estático con 10 slots siempre en DOM (fix del bug de display)
+- ✅ Steps de progreso animados: Subiendo → Analizando → Generando 10 → Listo
+- ✅ Timer de elapsed time durante generación
+- ✅ Thumbnail de imagen de contexto en el panel sexy
+
+**Flujo activo único para contenido sexy:**
+Clic en "✦ Más Sexy" sobre cualquier foto de contenido UGC → panel sexy aparece → 3 imágenes se suben → workflow ComfyUI Cloud genera 10 fotos en el mismo contexto → aparecen en grid 5×2
+
+**Fase 4B eliminada del UI.** El deployment `5eb42961` sigue roto pero ya no es relevante.

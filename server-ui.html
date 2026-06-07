@@ -317,6 +317,14 @@
   @keyframes spin { to { transform: rotate(360deg) } }
   .btn-download { position: absolute; bottom: 5px; right: 5px; padding: 3px 9px; background: rgba(0,0,0,.75); border: 1px solid #444; border-radius: 5px; color: #ccc; font-size: 0.65rem; font-weight: 600; cursor: pointer; flex: unset; backdrop-filter: blur(4px); transition: background .15s }
   .btn-download:hover { background: rgba(232,93,138,.8); border-color: #C8FF00; color: #fff }
+  .btn-mas-sexy { position: absolute; bottom: 5px; left: 5px; padding: 3px 9px; background: rgba(200,255,0,0.12); border: 1px solid #C8FF00; border-radius: 5px; color: #C8FF00; font-size: 0.65rem; font-weight: 700; cursor: pointer; flex: unset; backdrop-filter: blur(4px); transition: background .15s, color .15s }
+  .btn-mas-sexy:hover { background: #C8FF00; color: #000 }
+  .sx-step { padding: 3px 10px; border-radius: 12px; font-weight: 600; transition: .2s; white-space: nowrap }
+  .sx-step-pending  { background: #1a1a1a; color: #555; border: 1px solid #2a2a2a }
+  .sx-step-active   { background: rgba(200,255,0,0.12); color: #C8FF00; border: 1px solid #C8FF00 }
+  .sx-step-done     { background: rgba(74,222,128,0.12); color: #4ade80; border: 1px solid #4ade80 }
+  .sx-step-error    { background: rgba(248,113,113,0.12); color: #f87171; border: 1px solid #f87171 }
+  .sx-sep { color: #333; display: flex; align-items: center; padding: 0 4px; font-size: 0.7rem }
   .btn-generate-week { margin-top: 18px; width: 100%; padding: 13px; font-size: 0.95rem; background: #C8FF00; color: #000; border-radius: 12px; letter-spacing: 0.02em; flex: unset }
   .btn-save-week { margin-top: 10px; flex: unset; padding: 9px 20px; background: #4ade8033; border: 1px solid #4ade8066; color: #4ade80; font-size: 0.82rem; border-radius: 10px; width: 100% }
   .btn-save-week:hover:not(:disabled) { background: #4ade8055 }
@@ -922,6 +930,40 @@
     </button>
   </div>
 
+  <!-- Panel de resultados sexy — se muestra al hacer clic en "✦ Más Sexy" -->
+  <div id="sexy-result-section" style="display:none; margin-top:28px">
+    <div class="phase-header" style="align-items:center; gap:12px">
+      <span class="phase-badge" style="background:linear-gradient(135deg,#ff0080,#C8FF00);color:#000">✦</span>
+      <h2 style="margin:0">Imágenes Sexy</h2>
+      <img id="sexy-context-thumb" src="" alt="contexto" style="width:30px;height:53px;object-fit:cover;border-radius:4px;border:1px solid #333;display:none" />
+      <button onclick="document.getElementById('sexy-result-section').style.display='none'"
+        style="margin-left:auto;background:none;border:1px solid #444;color:#888;border-radius:6px;padding:3px 12px;cursor:pointer;font-size:0.8rem;flex:unset">✕ Cerrar</button>
+    </div>
+    <div style="display:flex;align-items:center;gap:0;flex-wrap:wrap;margin:10px 0 6px">
+      <span id="sxstep-upload"   class="sx-step sx-step-pending">Subiendo</span>
+      <span class="sx-sep">→</span>
+      <span id="sxstep-analyze"  class="sx-step sx-step-pending">Analizando</span>
+      <span class="sx-sep">→</span>
+      <span id="sxstep-generate" class="sx-step sx-step-pending">Generando 10</span>
+      <span class="sx-sep">→</span>
+      <span id="sxstep-done"     class="sx-step sx-step-pending">Listo</span>
+      <span id="sexy-elapsed" style="margin-left:14px;color:#666;font-size:0.72rem"></span>
+    </div>
+    <div id="sexy-status-inline" class="status-bar"></div>
+    <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-top:10px">
+      <div class="variation-image-slot" id="slot-sexy-1"><div class="slot-placeholder">Sin imagen</div></div>
+      <div class="variation-image-slot" id="slot-sexy-2"><div class="slot-placeholder">Sin imagen</div></div>
+      <div class="variation-image-slot" id="slot-sexy-3"><div class="slot-placeholder">Sin imagen</div></div>
+      <div class="variation-image-slot" id="slot-sexy-4"><div class="slot-placeholder">Sin imagen</div></div>
+      <div class="variation-image-slot" id="slot-sexy-5"><div class="slot-placeholder">Sin imagen</div></div>
+      <div class="variation-image-slot" id="slot-sexy-6"><div class="slot-placeholder">Sin imagen</div></div>
+      <div class="variation-image-slot" id="slot-sexy-7"><div class="slot-placeholder">Sin imagen</div></div>
+      <div class="variation-image-slot" id="slot-sexy-8"><div class="slot-placeholder">Sin imagen</div></div>
+      <div class="variation-image-slot" id="slot-sexy-9"><div class="slot-placeholder">Sin imagen</div></div>
+      <div class="variation-image-slot" id="slot-sexy-10"><div class="slot-placeholder">Sin imagen</div></div>
+    </div>
+  </div>
+
   </div><!-- end workspace -->
 </div><!-- end container -->
 
@@ -1011,6 +1053,7 @@ let generatedBodyUrl      = null
 let generatedPersonaText  = null
 let currentContentPlan    = null
 let lastContentRunId      = null   // guardado para poder recuperar imágenes si hay timeout
+let lastSexyContentRunId   = null
 
 // Toggle state
 const sectionState = { images: false, params: false, body: false, prompt: false }
@@ -1538,6 +1581,7 @@ function showNewInfluencerFlow() {
   generatedBodyUrl      = null
   generatedPersonaText  = null
   currentContentPlan    = null
+  lastSexyContentRunId   = null
 
   document.getElementById('create-section').style.display = 'block'
   document.getElementById('progress-section').style.display = 'none'
@@ -1551,6 +1595,7 @@ function showNewInfluencerFlow() {
   document.getElementById('copy-wrap').style.display = 'none'
   document.getElementById('btn-generate-plan').disabled = true
   document.getElementById('content-calendar-wrap').style.display = 'none'
+  document.getElementById('sexy-result-section').style.display = 'none'
   setContentPlanStatus('Completa el pipeline o selecciona una influencer guardada.')
 
   document.getElementById('p4-face-empty').style.display = 'flex'
@@ -1880,8 +1925,10 @@ async function generateContentPlan() {
     if (!res.ok || data.error) throw new Error(data.error || `HTTP ${res.status}`)
 
     currentContentPlan = data.plan
+    lastSexyContentRunId = null
     renderCalendar(data.plan)
     setContentPlanStatus(`Plan generado: "${data.plan.theme}"`, 'success')
+    setSexyContentStatus('Plan normal listo. Ahora puedes generar el plan sexy con el mismo tema.')
   } catch (err) {
     setContentPlanStatus(`Error: ${err.message}`, 'error')
   } finally {
@@ -2001,8 +2048,13 @@ function renderContentImages(imgs) {
       dlBtn.className = 'btn-download'
       dlBtn.textContent = 'Descargar'
       dlBtn.addEventListener('click', () => downloadImage(imgUrl, `slot${i + 1}.jpg`))
+      const sexyBtn = document.createElement('button')
+      sexyBtn.className = 'btn-mas-sexy'
+      sexyBtn.textContent = '✦ Más Sexy'
+      sexyBtn.addEventListener('click', (e) => { e.stopPropagation(); generateSexyFromContent(imgUrl) })
       slotEl.appendChild(img)
       slotEl.appendChild(dlBtn)
+      slotEl.appendChild(sexyBtn)
     } else if (slotEl) {
       slotEl.innerHTML = '<div class="slot-placeholder" style="color:#888">Sin imagen</div>'
     }
@@ -2092,6 +2144,168 @@ async function downloadImage(url, filename) {
   }
 }
 
+let _sexyElapsedTimer = null
+function setSxStep(id, state) {
+  const el = document.getElementById(id)
+  if (!el) return
+  el.className = `sx-step sx-step-${state}`
+}
+function startSexyTimer() {
+  const start = Date.now()
+  const el = document.getElementById('sexy-elapsed')
+  if (_sexyElapsedTimer) clearInterval(_sexyElapsedTimer)
+  _sexyElapsedTimer = setInterval(() => {
+    const s = Math.floor((Date.now() - start) / 1000)
+    if (el) el.textContent = `${s}s`
+  }, 1000)
+}
+function stopSexyTimer() {
+  if (_sexyElapsedTimer) { clearInterval(_sexyElapsedTimer); _sexyElapsedTimer = null }
+}
+
+async function generateSexyFromContent(contextoUrl) {
+  if (!generatedFaceUrl || !generatedBodyUrl) {
+    alert('Necesitas generar primero el rostro y el cuerpo del influencer.')
+    return
+  }
+
+  // Mostrar panel y thumbnail de contexto
+  const section = document.getElementById('sexy-result-section')
+  section.style.display = 'block'
+  section.scrollIntoView({ behavior: 'smooth', block: 'start' })
+
+  const thumb = document.getElementById('sexy-context-thumb')
+  thumb.src = contextoUrl
+  thumb.style.display = 'block'
+
+  // Reset steps
+  ;['upload','analyze','generate','done'].forEach(s => setSxStep(`sxstep-${s}`, 'pending'))
+  document.getElementById('sexy-elapsed').textContent = ''
+
+  // Spinners en los 10 slots
+  for (let s = 1; s <= 10; s++) {
+    const slot = document.getElementById(`slot-sexy-${s}`)
+    if (slot) slot.innerHTML = '<div class="slot-spinner"></div>'
+  }
+
+  setSxStep('sxstep-upload', 'active')
+  setSexyContentStatus('Subiendo imágenes a ComfyUI Cloud...')
+  startSexyTimer()
+
+  try {
+    const res = await fetch('/api/generate-sexy-from-content', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ face_url: generatedFaceUrl, body_url: generatedBodyUrl, contexto_url: contextoUrl }),
+    })
+    const data = await res.json()
+    if (!res.ok || data.error) throw new Error(data.error || `HTTP ${res.status}`)
+
+    setSxStep('sxstep-upload', 'done')
+    setSxStep('sxstep-analyze', 'active')
+    setSexyContentStatus('Analizando identidad y contexto (Claude)... (~1-2 min)')
+
+    lastSexyContentRunId = data.runId
+    await pollSexyContentRun(data.runId)
+
+    stopSexyTimer()
+    setSxStep('sxstep-generate', 'done')
+    setSxStep('sxstep-done', 'done')
+    setSexyContentStatus('10 imágenes generadas.', 'success')
+  } catch (err) {
+    stopSexyTimer()
+    ;['upload','analyze','generate','done'].forEach(s => setSxStep(`sxstep-${s}`, 'error'))
+    if (!err.isPollingError) {
+      for (let s = 1; s <= 10; s++) {
+        const slot = document.getElementById(`slot-sexy-${s}`)
+        if (slot) slot.innerHTML = `<div class="slot-placeholder" style="color:#f87171">Error: ${escHtml(err.message)}</div>`
+      }
+    }
+    setSexyContentStatus(`Error: ${err.message}`, 'error')
+  }
+}
+
+function renderSexyImages(imgs) {
+  const all = (imgs || []).slice(0, 10)
+  for (let i = 0; i < 10; i++) {
+    const slotEl = document.getElementById(`slot-sexy-${i + 1}`)
+    const imgUrl = all[i]
+    if (slotEl && imgUrl) {
+      slotEl.textContent = ''
+      const img = document.createElement('img')
+      img.src = imgUrl
+      img.alt = `ZSEXY${i + 1}`
+      img.addEventListener('click', () => window.open(imgUrl, '_blank'))
+      const dlBtn = document.createElement('button')
+      dlBtn.className = 'btn-download'
+      dlBtn.textContent = 'Descargar'
+      dlBtn.addEventListener('click', () => downloadImage(imgUrl, `zsexy${i + 1}.jpg`))
+      slotEl.appendChild(img)
+      slotEl.appendChild(dlBtn)
+    } else if (slotEl) {
+      slotEl.innerHTML = '<div class="slot-placeholder" style="color:#888">Sin imagen</div>'
+    }
+  }
+}
+
+async function pollSexyContentRun(runId, deadline = Date.now() + 1_200_000) {
+  let pollCount = 0
+  while (Date.now() < deadline) {
+    await sleep(POLL_INTERVAL)
+    try {
+      const res  = await fetch(`/api/status/${runId}`)
+      const data = await res.json()
+
+      if (data.status === 'success') {
+        renderSexyImages(data.sexyImages)
+        return
+      }
+
+      if (data.status === 'error') {
+        for (let i = 0; i < 10; i++) {
+          const slotEl = document.getElementById(`slot-sexy-${i + 1}`)
+          if (slotEl) slotEl.innerHTML = `<div class="slot-placeholder" style="color:#f87171">${escHtml(data.message || 'error')}</div>`
+        }
+        const err = new Error(data.message || 'ComfyCloud sexy error')
+        err.isPollingError = true
+        throw err
+      }
+
+      // Avanzar steps visualmente: tras 2 polls en running → probablemente generando Seedream
+      pollCount++
+      if (pollCount === 1) {
+        setSxStep('sxstep-analyze', 'active')
+        setSexyContentStatus('Analizando identidad y contexto (Claude)...')
+      } else if (pollCount === 3) {
+        setSxStep('sxstep-analyze', 'done')
+        setSxStep('sxstep-generate', 'active')
+        setSexyContentStatus('Generando 10 imágenes con Seedream... (~3-5 min más)')
+      }
+    } catch (err) {
+      if (err.isPollingError) throw err
+      console.warn('poll sexy content error:', err.message)
+    }
+  }
+
+  try {
+    const tRes  = await fetch(`/api/status/${runId}`)
+    const tData = await tRes.json()
+    if (tData.status === 'success' && tData.sexyImages?.length) {
+      renderSexyImages(tData.sexyImages)
+      return
+    }
+  } catch {}
+
+  for (let i = 0; i < 10; i++) {
+    const slotEl = document.getElementById(`slot-sexy-${i + 1}`)
+    if (slotEl) slotEl.innerHTML = '<div class="slot-placeholder" style="color:#f87171">Timeout</div>'
+  }
+  const err = new Error('Timeout generando imágenes sexy')
+  err.isPollingError = true
+  throw err
+}
+
+
 async function saveWeek() {
   if (!selectedInfluencer) {
     setContentPlanStatus('Guarda la influencer primero para poder guardar semanas.', 'error')
@@ -2129,6 +2343,11 @@ async function saveWeek() {
 // ── Helpers ───────────────────────────────────────────────────────────────────
 function setContentPlanStatus(msg, cls = '') {
   const el = document.getElementById('content-plan-status')
+  el.textContent = msg; el.className = `status-bar ${cls}`
+}
+function setSexyContentStatus(msg, cls = '') {
+  const el = document.getElementById('sexy-status-inline')
+  if (!el) return
   el.textContent = msg; el.className = `status-bar ${cls}`
 }
 function escHtml(s) {

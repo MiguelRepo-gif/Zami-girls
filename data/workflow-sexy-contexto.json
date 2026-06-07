@@ -1,0 +1,746 @@
+{
+  "673": {
+    "inputs": {
+      "source": [
+        "676",
+        0
+      ]
+    },
+    "class_type": "PreviewAny",
+    "_meta": {
+      "title": "Preview as Text"
+    }
+  },
+  "676": {
+    "inputs": {
+      "prompt": [
+        "789",
+        0
+      ],
+      "model": "Sonnet 4.5",
+      "model.max_tokens": 32768,
+      "model.temperature": 1,
+      "model.reasoning_effort": "off",
+      "seed": 777923244,
+      "system_prompt": "You are an expert AI image generation prompt writer for sexy Instagram UGC influencer content.\n\nYou receive a detailed identity and location analysis (FACE_IDENTITY, BODY_REFERENCE, CHARACTER_LOCK, CONTEXT_LOCK, SEXY_INSTAGRAM_STYLE) and a base reference image of the adult influencer already positioned in the context location. Generate exactly 10 distinct image generation prompts for the SAME adult influencer, ALL in the SAME location defined in CONTEXT_LOCK.\n\nCORE CONCEPT: This influencer is having a real content session in one specific location (CONTEXT_LOCK). She takes 10 photos in that SAME place — same decor, same lighting, same setting — but each photo shows a different angle, pose, and moment. Like a real influencer content day: 10 shots, one location, progressively sexier.\n\nCRITICAL — LOCATION RULE:\n- ALL 10 prompts must be set in the EXACT location from CONTEXT_LOCK\n- Reference specific elements from CONTEXT_LOCK in each prompt (e.g., if kitchen: \"leaning against the marble countertop\", \"sitting on the kitchen island\", \"reaching up to the upper cabinet\"; if pool: \"hand on pool ledge\", \"standing at pool edge\", \"water visible behind her\")\n- Do NOT invent new settings or move her to a different place\n- Every prompt's background must be recognizably the same location\n\nMANDATORY POSE STRUCTURE — 10 poses for the same location:\n- Prompt 1 → Establishing full body, 3/4 facing camera, confident, natural interaction with the location — \"I just arrived and I look good here\" energy\n- Prompt 2 → From behind, looking back over shoulder — back to camera, glutes and waist-to-hip ratio center-framed, hand resting on a surface from the location\n- Prompt 3 → Tight selfie from above — face and upper chest prominent, direct camera contact, location visible in background bokeh\n- Prompt 4 → Full body from slightly below eye level — camera at waist height looking up, full leg-to-head silhouette, location context visible\n- Prompt 5 → From behind, looking back over shoulder — different interaction point with the location than Prompt 2, more confidence\n- Prompt 6 → 3/4 facing, direct eye contact, hip pop, one hand on hip or raised to touch hair, body-forward framing\n- Prompt 7 → Candid mid-action — doing something natural in the location (reaching, stretching, leaning, adjusting hair), caught in motion, genuine moment\n- Prompt 8 → From behind — back arched, hip pushed to one side, head turned with smoldering gaze, the most provocative from-behind composition\n- Prompt 9 → Tight waist-to-thigh crop — no face, body curve and outfit detail filling the frame, location surface visible as background\n- Prompt 10 → Seated or reclining in the location — most intimate and direct, face fully visible, confident eye contact, \"you caught me here\" energy\n\nPROGRESSION RULE — each prompt slightly more provocative than the last:\n- Prompts 1–3: confident and sexy but accessible, lifestyle influencer energy\n- Prompts 4–6: overtly body-forward, outfit detail prominent, clearly body-confident\n- Prompts 7–9: maximum body emphasis, composition pushes outfit to its limit, scroll-stopping\n- Prompt 10: intimate and personal, most direct camera connection\n\nOUTFIT RULE — one cohesive outfit family for all 10:\n- From CONTEXT_LOCK and SEXY_INSTAGRAM_STYLE, determine the best outfit for this specific location\n- Keep the same outfit family across all 10 (if pool: bikini all 10; if gym: sports bra + shorts all 10; if kitchen/indoor: crop top + micro shorts or bodycon all 10)\n- Natural micro-variations allowed within the same outfit (strap adjusted, tied differently, sarong dropped) but always recognizably the same look\n- No two prompts may use the exact same camera angle + pose + body position combination\n\nWHAT EVERY PROMPT MUST INCLUDE (all 5 elements):\n1. Shot type: camera angle and distance\n2. Exact pose mechanics: body position with specificity (describe what each body part is doing)\n3. Location interaction: how she relates to the specific space from CONTEXT_LOCK — name specific surfaces or elements\n4. Outfit detail: fabric + color + coverage (same family, natural micro-variation)\n5. One authenticity signal per prompt — rotate: wet skin glistening / real phone grain visible / slight motion blur / loose natural hair / slightly overexposed highlights / candid imperfect framing / natural skin texture with pores visible / warm skin glow / hair movement / sweat sheen\n\nOUTPUT FORMAT:\n- Separate each prompt with a single line containing only: *\n- Each prompt is ONE dense visual paragraph, 80-110 words, generation-ready\n- Begin every prompt with: Shot on iPhone 15 Pro,\n- Output ONLY the 10 prompts separated by * — no numbering, no preamble, nothing else\n\nHARD SAFETY RULES (never violate):\n- No nude, naked, topless, nipples, genitalia, sex acts, pornographic, or explicit content\n- No minors\n- Clothing must always technically cover required anatomy — body-confident and sexy, never explicit\n\nSTYLE INTENT:\nEvery prompt must feel like a real candid iPhone photo from this influencer's actual content session in this specific location — not a studio shoot, not editorial. Authentic, confident, magnetic, sexy without being explicit. Natural expressions: confident, smoldering, or candid — never exaggerated. The viewer should believe she actually spent an afternoon here taking these shots.\n\nprompt max length 2700",
+      "images.image_1": [
+        "727",
+        0
+      ],
+      "images.image_2": [
+        "728",
+        0
+      ],
+      "images.image_3": [
+        "729",
+        0
+      ]
+    },
+    "class_type": "ClaudeNode",
+    "_meta": {
+      "title": "Anthropic Claude"
+    }
+  },
+  "677": {
+    "inputs": {
+      "text": [
+        "673",
+        0
+      ]
+    },
+    "class_type": "Text Multiline",
+    "_meta": {
+      "title": "INSTRUCTIONS"
+    }
+  },
+  "678": {
+    "inputs": {
+      "string": [
+        "677",
+        0
+      ],
+      "sep": "*",
+      "maxsplit": -1
+    },
+    "class_type": "Basic data handling: StringSplitList",
+    "_meta": {
+      "title": "split (to LIST)"
+    }
+  },
+  "679": {
+    "inputs": {
+      "index": 0,
+      "list": [
+        "678",
+        0
+      ]
+    },
+    "class_type": "Basic data handling: ListGetItem",
+    "_meta": {
+      "title": "get item"
+    }
+  },
+  "680": {
+    "inputs": {
+      "index": 1,
+      "list": [
+        "678",
+        0
+      ]
+    },
+    "class_type": "Basic data handling: ListGetItem",
+    "_meta": {
+      "title": "get item"
+    }
+  },
+  "681": {
+    "inputs": {
+      "index": 2,
+      "list": [
+        "678",
+        0
+      ]
+    },
+    "class_type": "Basic data handling: ListGetItem",
+    "_meta": {
+      "title": "get item"
+    }
+  },
+  "682": {
+    "inputs": {
+      "index": 3,
+      "list": [
+        "678",
+        0
+      ]
+    },
+    "class_type": "Basic data handling: ListGetItem",
+    "_meta": {
+      "title": "get item"
+    }
+  },
+  "683": {
+    "inputs": {
+      "index": 4,
+      "list": [
+        "678",
+        0
+      ]
+    },
+    "class_type": "Basic data handling: ListGetItem",
+    "_meta": {
+      "title": "get item"
+    }
+  },
+  "684": {
+    "inputs": {
+      "index": 5,
+      "list": [
+        "678",
+        0
+      ]
+    },
+    "class_type": "Basic data handling: ListGetItem",
+    "_meta": {
+      "title": "get item"
+    }
+  },
+  "685": {
+    "inputs": {
+      "index": 6,
+      "list": [
+        "678",
+        0
+      ]
+    },
+    "class_type": "Basic data handling: ListGetItem",
+    "_meta": {
+      "title": "get item"
+    }
+  },
+  "686": {
+    "inputs": {
+      "index": 7,
+      "list": [
+        "678",
+        0
+      ]
+    },
+    "class_type": "Basic data handling: ListGetItem",
+    "_meta": {
+      "title": "get item"
+    }
+  },
+  "687": {
+    "inputs": {
+      "index": 8,
+      "list": [
+        "678",
+        0
+      ]
+    },
+    "class_type": "Basic data handling: ListGetItem",
+    "_meta": {
+      "title": "get item"
+    }
+  },
+  "688": {
+    "inputs": {
+      "index": 9,
+      "list": [
+        "678",
+        0
+      ]
+    },
+    "class_type": "Basic data handling: ListGetItem",
+    "_meta": {
+      "title": "get item"
+    }
+  },
+  "689": {
+    "inputs": {
+      "prompt": [
+        "679",
+        0
+      ],
+      "model": "seedream-4-5-251128",
+      "model.size_preset": "(2K) 1600x2848 (9:16)",
+      "model.width": 2048,
+      "model.height": 2048,
+      "model.max_images": 1,
+      "model.fail_on_partial": false,
+      "seed": 1396922830,
+      "watermark": false,
+      "model.images.image_1": [
+        "727",
+        0
+      ],
+      "model.images.image_2": [
+        "728",
+        0
+      ],
+      "model.images.image_3": [
+        "729",
+        0
+      ]
+    },
+    "class_type": "ByteDanceSeedreamNodeV2",
+    "_meta": {
+      "title": "ByteDance Seedream 4.5 & 5.0"
+    }
+  },
+  "692": {
+    "inputs": {
+      "prompt": [
+        "680",
+        0
+      ],
+      "model": "seedream-4-5-251128",
+      "model.size_preset": "(2K) 1600x2848 (9:16)",
+      "model.width": 2048,
+      "model.height": 2048,
+      "model.max_images": 1,
+      "model.fail_on_partial": false,
+      "seed": 370110140,
+      "watermark": false,
+      "model.images.image_1": [
+        "727",
+        0
+      ],
+      "model.images.image_2": [
+        "728",
+        0
+      ],
+      "model.images.image_3": [
+        "729",
+        0
+      ]
+    },
+    "class_type": "ByteDanceSeedreamNodeV2",
+    "_meta": {
+      "title": "ByteDance Seedream 4.5 & 5.0"
+    }
+  },
+  "694": {
+    "inputs": {
+      "prompt": [
+        "681",
+        0
+      ],
+      "model": "seedream-4-5-251128",
+      "model.size_preset": "(2K) 1600x2848 (9:16)",
+      "model.width": 2048,
+      "model.height": 2048,
+      "model.max_images": 1,
+      "model.fail_on_partial": false,
+      "seed": 265491130,
+      "watermark": false,
+      "model.images.image_1": [
+        "727",
+        0
+      ],
+      "model.images.image_2": [
+        "728",
+        0
+      ],
+      "model.images.image_3": [
+        "729",
+        0
+      ]
+    },
+    "class_type": "ByteDanceSeedreamNodeV2",
+    "_meta": {
+      "title": "ByteDance Seedream 4.5 & 5.0"
+    }
+  },
+  "695": {
+    "inputs": {
+      "filename_prefix": "ZSEXY1",
+      "images": [
+        "689",
+        0
+      ]
+    },
+    "class_type": "SaveImage",
+    "_meta": {
+      "title": "Save Image"
+    }
+  },
+  "696": {
+    "inputs": {
+      "filename_prefix": "ZSEXY2",
+      "images": [
+        "692",
+        0
+      ]
+    },
+    "class_type": "SaveImage",
+    "_meta": {
+      "title": "Save Image"
+    }
+  },
+  "697": {
+    "inputs": {
+      "filename_prefix": "ZSEXY3",
+      "images": [
+        "694",
+        0
+      ]
+    },
+    "class_type": "SaveImage",
+    "_meta": {
+      "title": "Save Image"
+    }
+  },
+  "698": {
+    "inputs": {
+      "filename_prefix": "ZSEXY4",
+      "images": [
+        "700",
+        0
+      ]
+    },
+    "class_type": "SaveImage",
+    "_meta": {
+      "title": "Save Image"
+    }
+  },
+  "700": {
+    "inputs": {
+      "prompt": [
+        "682",
+        0
+      ],
+      "model": "seedream-4-5-251128",
+      "model.size_preset": "(2K) 1600x2848 (9:16)",
+      "model.width": 2048,
+      "model.height": 2048,
+      "model.max_images": 1,
+      "model.fail_on_partial": false,
+      "seed": 111992090,
+      "watermark": false,
+      "model.images.image_1": [
+        "727",
+        0
+      ],
+      "model.images.image_2": [
+        "728",
+        0
+      ],
+      "model.images.image_3": [
+        "729",
+        0
+      ]
+    },
+    "class_type": "ByteDanceSeedreamNodeV2",
+    "_meta": {
+      "title": "ByteDance Seedream 4.5 & 5.0"
+    }
+  },
+  "701": {
+    "inputs": {
+      "filename_prefix": "ZSEXY5",
+      "images": [
+        "703",
+        0
+      ]
+    },
+    "class_type": "SaveImage",
+    "_meta": {
+      "title": "Save Image"
+    }
+  },
+  "703": {
+    "inputs": {
+      "prompt": [
+        "683",
+        0
+      ],
+      "model": "seedream-4-5-251128",
+      "model.size_preset": "(2K) 1600x2848 (9:16)",
+      "model.width": 2048,
+      "model.height": 2048,
+      "model.max_images": 1,
+      "model.fail_on_partial": false,
+      "seed": 466774473,
+      "watermark": false,
+      "model.images.image_1": [
+        "727",
+        0
+      ],
+      "model.images.image_2": [
+        "728",
+        0
+      ],
+      "model.images.image_3": [
+        "729",
+        0
+      ]
+    },
+    "class_type": "ByteDanceSeedreamNodeV2",
+    "_meta": {
+      "title": "ByteDance Seedream 4.5 & 5.0"
+    }
+  },
+  "704": {
+    "inputs": {
+      "filename_prefix": "ZSEXY6",
+      "images": [
+        "706",
+        0
+      ]
+    },
+    "class_type": "SaveImage",
+    "_meta": {
+      "title": "Save Image"
+    }
+  },
+  "706": {
+    "inputs": {
+      "prompt": [
+        "684",
+        0
+      ],
+      "model": "seedream-4-5-251128",
+      "model.size_preset": "(2K) 1600x2848 (9:16)",
+      "model.width": 2048,
+      "model.height": 2048,
+      "model.max_images": 1,
+      "model.fail_on_partial": false,
+      "seed": 564679384,
+      "watermark": false,
+      "model.images.image_1": [
+        "727",
+        0
+      ],
+      "model.images.image_2": [
+        "728",
+        0
+      ],
+      "model.images.image_3": [
+        "729",
+        0
+      ]
+    },
+    "class_type": "ByteDanceSeedreamNodeV2",
+    "_meta": {
+      "title": "ByteDance Seedream 4.5 & 5.0"
+    }
+  },
+  "708": {
+    "inputs": {
+      "prompt": [
+        "685",
+        0
+      ],
+      "model": "seedream-4-5-251128",
+      "model.size_preset": "(2K) 1600x2848 (9:16)",
+      "model.width": 2048,
+      "model.height": 2048,
+      "model.max_images": 1,
+      "model.fail_on_partial": false,
+      "seed": 871319834,
+      "watermark": false,
+      "model.images.image_1": [
+        "727",
+        0
+      ],
+      "model.images.image_2": [
+        "728",
+        0
+      ],
+      "model.images.image_3": [
+        "729",
+        0
+      ]
+    },
+    "class_type": "ByteDanceSeedreamNodeV2",
+    "_meta": {
+      "title": "ByteDance Seedream 4.5 & 5.0"
+    }
+  },
+  "709": {
+    "inputs": {
+      "filename_prefix": "ZSEXY7",
+      "images": [
+        "708",
+        0
+      ]
+    },
+    "class_type": "SaveImage",
+    "_meta": {
+      "title": "Save Image"
+    }
+  },
+  "710": {
+    "inputs": {
+      "filename_prefix": "ZSEXY8",
+      "images": [
+        "712",
+        0
+      ]
+    },
+    "class_type": "SaveImage",
+    "_meta": {
+      "title": "Save Image"
+    }
+  },
+  "712": {
+    "inputs": {
+      "prompt": [
+        "686",
+        0
+      ],
+      "model": "seedream-4-5-251128",
+      "model.size_preset": "(2K) 1600x2848 (9:16)",
+      "model.width": 2048,
+      "model.height": 2048,
+      "model.max_images": 1,
+      "model.fail_on_partial": false,
+      "seed": 541818659,
+      "watermark": false,
+      "model.images.image_1": [
+        "727",
+        0
+      ],
+      "model.images.image_2": [
+        "728",
+        0
+      ],
+      "model.images.image_3": [
+        "729",
+        0
+      ]
+    },
+    "class_type": "ByteDanceSeedreamNodeV2",
+    "_meta": {
+      "title": "ByteDance Seedream 4.5 & 5.0"
+    }
+  },
+  "713": {
+    "inputs": {
+      "filename_prefix": "ZSEXY9",
+      "images": [
+        "715",
+        0
+      ]
+    },
+    "class_type": "SaveImage",
+    "_meta": {
+      "title": "Save Image"
+    }
+  },
+  "715": {
+    "inputs": {
+      "prompt": [
+        "687",
+        0
+      ],
+      "model": "seedream-4-5-251128",
+      "model.size_preset": "(2K) 1600x2848 (9:16)",
+      "model.width": 2048,
+      "model.height": 2048,
+      "model.max_images": 1,
+      "model.fail_on_partial": false,
+      "seed": 1492580264,
+      "watermark": false,
+      "model.images.image_1": [
+        "727",
+        0
+      ],
+      "model.images.image_2": [
+        "728",
+        0
+      ],
+      "model.images.image_3": [
+        "729",
+        0
+      ]
+    },
+    "class_type": "ByteDanceSeedreamNodeV2",
+    "_meta": {
+      "title": "ByteDance Seedream 4.5 & 5.0"
+    }
+  },
+  "716": {
+    "inputs": {
+      "filename_prefix": "ZSEXY10",
+      "images": [
+        "718",
+        0
+      ]
+    },
+    "class_type": "SaveImage",
+    "_meta": {
+      "title": "Save Image"
+    }
+  },
+  "718": {
+    "inputs": {
+      "prompt": [
+        "688",
+        0
+      ],
+      "model": "seedream-4-5-251128",
+      "model.size_preset": "(2K) 1600x2848 (9:16)",
+      "model.width": 2048,
+      "model.height": 2048,
+      "model.max_images": 1,
+      "model.fail_on_partial": false,
+      "seed": 1142383848,
+      "watermark": false,
+      "model.images.image_1": [
+        "727",
+        0
+      ],
+      "model.images.image_2": [
+        "728",
+        0
+      ],
+      "model.images.image_3": [
+        "729",
+        0
+      ]
+    },
+    "class_type": "ByteDanceSeedreamNodeV2",
+    "_meta": {
+      "title": "ByteDance Seedream 4.5 & 5.0"
+    }
+  },
+  "727": {
+    "inputs": {
+      "image": "5cb2a41485f7c6e4332e74749f4c4f61deda4dd30b7973906e578d4a68968802.png"
+    },
+    "class_type": "LoadImage",
+    "_meta": {
+      "title": "Load Image"
+    }
+  },
+  "728": {
+    "inputs": {
+      "image": "68c336899eb64e6b2a4735a6294833f6577ac5f6ebf0ee03cc97514e7c3c5a25.png"
+    },
+    "class_type": "LoadImage",
+    "_meta": {
+      "title": "Load Image"
+    }
+  },
+  "729": {
+    "inputs": {
+      "image": "e0697b09eb7d4979bc2904efc9dfe63ed7df9632deffb89f7bfb2f818b6f7871.png"
+    },
+    "class_type": "LoadImage",
+    "_meta": {
+      "title": "Load Image"
+    }
+  },
+  "785": {
+    "inputs": {
+      "prompt": "Analyze IMAGE_1 as the face/identity reference, IMAGE_2 as the body/proportions reference and IMAGE_3 as the context.",
+      "model": "Sonnet 4.5",
+      "model.max_tokens": 32768,
+      "model.temperature": 1,
+      "model.reasoning_effort": "off",
+      "seed": 489967059,
+      "system_prompt": "You are an expert AI influencer identity, body-consistency, and sexy Instagram UGC analyst for image generation.\n\nYou will receive exactly 3 reference images:\n- IMAGE_1: Face / identity reference of the adult influencer.\n- IMAGE_2: Full-body / body proportions reference of the adult influencer.\n- IMAGE_3: Location / context reference — the specific place where ALL photos will be taken.\n\nAnalyze all 3 images carefully and return ONLY the completed template below.\nDo NOT add any preamble, commentary, markdown, numbering, or explanation.\nKeep the text \"[POSE_PROMPT]\" exactly as written.\n\nFACE_IDENTITY:\n[Describe IMAGE_1 with generation-ready visual descriptors: adult female face, apparent adult age range, ethnicity and skin tone, face shape, cheekbones, jawline, chin. Eye shape, size, and color. Eyebrow shape and color. Nose bridge and tip. Lip shape, fullness, and color. Hair: color, length, texture, and natural style as it falls. Makeup if visible. Expression and beauty mood. Any defining features. Be precise and visual. Do not speculate beyond visible traits.]\n\nBODY_REFERENCE:\n[Describe IMAGE_2 as a body proportions reference only: adult female body type, height impression (petite / average / tall), bust size and shape, waist definition and narrowness, waist-to-hip ratio, hip width and fullness, glutes shape and prominence, thigh and leg build, shoulder width, overall silhouette category (hourglass / athletic-curvy / slim-curvy / petite-curvy). Skin tone continuity with IMAGE_1. Posture and body aesthetic impression. Do NOT describe or preserve the outfit from IMAGE_2 — clothing comes from the pose prompt, not this reference.]\n\nCHARACTER_LOCK:\n[Strict consistency lock combining IMAGE_1 and IMAGE_2: same exact adult face, same skin tone across the entire body, same hair color and style, same body proportions and silhouette, same influencer identity. Every generated image must look like the same adult woman, whether she is in a bikini, a dress, or athletic wear.]\n\nCONTEXT_LOCK:\n[Analyze IMAGE_3 as the physical location where ALL 10 photos will be taken. Describe: the type of space (kitchen, pool, gym, hotel room, beach, rooftop, etc.), key visual elements and surfaces (countertops, appliances, pool water, gym mirrors, furniture, tiles, windows, architectural details), lighting quality and source (natural window light, afternoon sun, gym fluorescent, warm ambient glow), dominant colors and textures in the environment, and the overall mood/vibe. This is the ONLY setting for all 10 generated images — the influencer takes all 10 photos here, like a real content session in one place. Be specific enough that a photo model would know exactly where to stand and what surfaces/elements surround her.]\n\nSEXY_INSTAGRAM_STYLE:\n[Based on face, body, and context location combined: define this influencer's natural sexy Instagram UGC aesthetic in this specific setting. Which body features are most worth accentuating in this location? What outfit category best fits the location (bikini if pool/beach, crop top + micro shorts if gym/outdoor, casual-sexy if kitchen/indoor, bodycon mini if nightlife)? What is the overall Instagram mood — luxury lifestyle / fitness / domestic goddess / beach babe / urban nightlife? One concise paragraph. Non-nude, body-confident, aspirational.]\n\nPOSE PROMPT IMAGE:\n[POSE_PROMPT]\n\nIMPORTANT:\nUse IMAGE_1 as the exact face identity source.\nUse IMAGE_2 as the exact body and proportions source only — do NOT copy clothing, background, furniture, pose, or location from IMAGE_2.\nUse IMAGE_3 as the exact location and setting — place the influencer in this specific environment.\nDo NOT invent a different face, body, ethnicity, age, or skin tone.\nThe final image must look like the same adult influencer in every output.\nGenerate a highly photorealistic sexy Instagram UGC photograph.\nNatural anatomy. Detailed skin texture. Real phone camera realism.\nNo nudity. No explicit sexual content.",
+      "images.image_1": [
+        "727",
+        0
+      ],
+      "images.image_2": [
+        "728",
+        0
+      ],
+      "images.image_3": [
+        "729",
+        0
+      ]
+    },
+    "class_type": "ClaudeNode",
+    "_meta": {
+      "title": "Unified Image Analysis"
+    }
+  },
+  "788": {
+    "inputs": {
+      "value": "Shot on iPhone 15 Pro. Place the influencer in the exact location from IMAGE_3 — preserve all architectural details, surfaces, lighting, and setting elements from that space. Establishing full body portrait, slightly below eye level, handheld candid framing. Body-conscious minimal outfit suited to the location: high-cut micro string bikini or ultra-fitted bodycon mini set or crop top, fabric clinging to every curve, ultra high-cut hip line visible. Confident natural pose: slight hip pop, weight shifted to one leg, 3/4 facing camera, one arm relaxed or raised to touch hair, waist-to-hip ratio prominently framed. Natural skin texture, subtle warm glow on skin, no retouching. Real iPhone photo grain, portrait mode bokeh, slightly imperfect handheld framing, candid social media realism. No studio lighting, no flash. Ultra realistic photographic quality. No nudity, no explicit sexual content."
+    },
+    "class_type": "PrimitiveStringMultiline",
+    "_meta": {
+      "title": "Prompt 1"
+    }
+  },
+  "789": {
+    "inputs": {
+      "string": [
+        "791",
+        0
+      ],
+      "regex_pattern": "[POSE_PROMPT] ",
+      "replace": [
+        "788",
+        0
+      ],
+      "case_insensitive": true,
+      "multiline": false,
+      "dotall": false,
+      "count": 0
+    },
+    "class_type": "RegexReplace",
+    "_meta": {
+      "title": "Replace Text (Regex)"
+    }
+  },
+  "791": {
+    "inputs": {
+      "value": [
+        "785",
+        0
+      ]
+    },
+    "class_type": "PrimitiveStringMultiline",
+    "_meta": {
+      "title": "Prompt Template"
+    }
+  }
+}

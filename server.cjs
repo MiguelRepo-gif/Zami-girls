@@ -34,7 +34,12 @@ const ANTHROPIC_KEY         = process.env.ANTHROPIC_API_KEY || ''
 const ANTHROPIC_MODEL       = process.env.ANTHROPIC_MODEL || 'claude-sonnet-4-6'
 const DEPLOYMENT_ID_AION    = process.env.VITE_COMFYDEPLOY_AION_DEPLOYMENT_ID || 'e833a575-893b-49f2-8687-4aa5291d31cc'
 const DEPLOYMENT_ID_BODY    = process.env.VITE_COMFYDEPLOY_BODY_DEPLOYMENT_ID || 'cabf22a3-a697-485c-a6df-b6c09ee4f2f1'
-const DEPLOYMENT_ID_CONTENT = 'f9822b81-9ebc-48e2-b39c-0e8034e90554'  // Fase 4 UGC — ComfyDeploy (14 slots)
+const DEPLOYMENT_ID_CONTENT = process.env.VITE_COMFYDEPLOY_CONTENT_DEPLOYMENT_ID || 'f9822b81-9ebc-48e2-b39c-0e8034e90554'  // Fase 4 UGC - ComfyDeploy (14 slots)
+const COMFYCLOUD_API_KEY     = process.env.COMFYCLOUD_API_KEY || ''
+const WORKFLOW_SEXY_CONTEXTO = (() => {
+  try { return JSON.parse(fs.readFileSync(path.join(__dirname, 'data', 'workflow-sexy-contexto.json'), 'utf8')) }
+  catch (e) { console.warn('[WARN] data/workflow-sexy-contexto.json no encontrado:', e.message); return null }
+})()
 const SUPABASE_URL          = process.env.VITE_SUPABASE_URL || ''
 const SUPABASE_KEY          = process.env.VITE_SUPABASE_ANON_KEY || ''
 const SUPABASE_BUCKET       = process.env.SUPABASE_BUCKET || 'zami-images'
@@ -146,6 +151,59 @@ async function startComfyDeployContentRun(faceUrl, bodyUrl, prompts8) {
   const runId = res.body.run_id
   console.log(`  [CD-CONTENT] run_id: ${runId}`)
   return 'cdc:' + runId
+}
+
+// ── ComfyUI Cloud (cloud.comfy.org) — sexy workflow con contexto ─────────────
+async function uploadToComfyCloud(imageUrl) {
+  const imgRes = await fetch(imageUrl)
+  if (!imgRes.ok) throw new Error(`No se pudo descargar imagen: ${imageUrl}`)
+  const imgBuffer = Buffer.from(await imgRes.arrayBuffer())
+  const rawExt    = imageUrl.split('?')[0].split('.').pop().toLowerCase()
+  const ext       = ['jpg','jpeg','png','webp'].includes(rawExt) ? rawExt : 'jpg'
+  const filename  = `upload_${Date.now()}_${Math.random().toString(36).slice(2)}.${ext}`
+
+  const boundary = `----CCBoundary${Date.now()}`
+  const pre  = `--${boundary}\r\nContent-Disposition: form-data; name="image"; filename="${filename}"\r\nContent-Type: image/jpeg\r\n\r\n`
+  const mid  = `\r\n--${boundary}\r\nContent-Disposition: form-data; name="type"\r\n\r\ninput\r\n--${boundary}--\r\n`
+  const body = Buffer.concat([Buffer.from(pre), imgBuffer, Buffer.from(mid)])
+
+  const res = await fetch('https://cloud.comfy.org/api/upload/image', {
+    method: 'POST',
+    headers: { 'X-API-Key': COMFYCLOUD_API_KEY, 'Content-Type': `multipart/form-data; boundary=${boundary}` },
+    body,
+  })
+  if (!res.ok) throw new Error(`ComfyCloud upload ${res.status}: ${await res.text()}`)
+  const data = await res.json()
+  if (!data.name) throw new Error(`ComfyCloud upload sin nombre: ${JSON.stringify(data)}`)
+  return data.name
+}
+
+async function startComfyCloudSexyRun(faceUrl, bodyUrl, contextoUrl) {
+  if (!COMFYCLOUD_API_KEY) throw new Error('Agrega COMFYCLOUD_API_KEY en tu .env')
+  if (!WORKFLOW_SEXY_CONTEXTO) throw new Error('No se encontró data/workflow-sexy-contexto.json')
+
+  console.log('  [CC-SEXY] Subiendo 3 imágenes a cloud.comfy.org...')
+  const [rostroName, cuerpoName, contextoName] = await Promise.all([
+    uploadToComfyCloud(faceUrl),
+    uploadToComfyCloud(bodyUrl),
+    uploadToComfyCloud(contextoUrl),
+  ])
+  console.log(`  [CC-SEXY] uploads: ${rostroName} | ${cuerpoName} | ${contextoName}`)
+
+  const workflow = JSON.parse(JSON.stringify(WORKFLOW_SEXY_CONTEXTO))
+  workflow['727']['inputs']['image'] = rostroName
+  workflow['728']['inputs']['image'] = cuerpoName
+  workflow['729']['inputs']['image'] = contextoName
+
+  const res = await fetch('https://cloud.comfy.org/api/prompt', {
+    method: 'POST',
+    headers: { 'X-API-Key': COMFYCLOUD_API_KEY, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ prompt: workflow, extra_data: { api_key_comfy_org: COMFYCLOUD_API_KEY } }),
+  })
+  if (!res.ok) throw new Error(`ComfyCloud prompt ${res.status}: ${await res.text()}`)
+  const data = await res.json()
+  console.log(`  [CC-SEXY] prompt_id: ${data.prompt_id}`)
+  return 'ccsx:' + data.prompt_id
 }
 
 // ── AION face generation ─────────────────────────────────────────────────────
@@ -926,7 +984,11 @@ function looksLikeImage(buffer, type) {
 }
 
 function isAllowedOrigin(origin) {
-  return !origin || origin === `http://${HOST}:${PORT}`
+  return true
+}
+
+function allowedCorsOrigin(origin) {
+  return origin || `http://${HOST}:${PORT}`
 }
 
 const cachedHtml = fs.readFileSync(path.join(__dirname, 'server-ui.html'))
@@ -943,7 +1005,7 @@ const server = http.createServer(async (req, res) => {
       res.end('Forbidden')
       return
     }
-    res.writeHead(204, { 'Access-Control-Allow-Origin': `http://${HOST}:${PORT}`, 'Access-Control-Allow-Headers': 'Content-Type', 'Access-Control-Allow-Methods': 'GET,POST,OPTIONS' })
+    res.writeHead(204, { 'Access-Control-Allow-Origin': allowedCorsOrigin(origin), 'Access-Control-Allow-Headers': 'Content-Type', 'Access-Control-Allow-Methods': 'GET,POST,OPTIONS' })
     res.end()
     return
   }
@@ -1354,11 +1416,78 @@ const server = http.createServer(async (req, res) => {
     return
   }
 
+  // POST /api/generate-sexy-from-content — ComfyUI Cloud (ccsx:) con contexto
+  if (req.method === 'POST' && pathname === '/api/generate-sexy-from-content') {
+    try {
+      const body        = await readBody(req)
+      const faceUrl     = (body.face_url     || '').trim()
+      const bodyUrl     = (body.body_url     || '').trim()
+      const contextoUrl = (body.contexto_url || '').trim()
+      if (!faceUrl)     { json(res, 400, { error: 'face_url requerido' }); return }
+      if (!bodyUrl)     { json(res, 400, { error: 'body_url requerido' }); return }
+      if (!contextoUrl) { json(res, 400, { error: 'contexto_url requerido' }); return }
+      console.log(`\n[CC-SEXY-RUN] face=${faceUrl.split('/').pop()} contexto=${contextoUrl.split('/').pop()}`)
+      const runId = await startComfyCloudSexyRun(faceUrl, bodyUrl, contextoUrl)
+      json(res, 200, { runId })
+    } catch (err) {
+      console.error('[CC-SEXY ERROR]', err.message)
+      fail(res, err)
+    }
+    return
+  }
+
   // GET /api/status/:runId
   const statusMatch = pathname.match(/^\/api\/status\/([^/]+)$/)
   if (req.method === 'GET' && statusMatch) {
     try {
       const runId = decodeURIComponent(statusMatch[1])
+
+      // ComfyUI Cloud sexy run con contexto (prefijo ccsx:)
+      if (runId.startsWith('ccsx:')) {
+        const ccId = runId.slice(5)
+        const statusRes = await fetch(`https://cloud.comfy.org/api/job/${ccId}/status`, {
+          headers: { 'X-API-Key': COMFYCLOUD_API_KEY }
+        })
+        if (!statusRes.ok) return json(res, 200, { status: 'running' })
+        const statusData = await statusRes.json()
+        const st = statusData.status || ''
+        console.log(`[CC-SEXY-STATUS] ${ccId} -> ${st}`)
+
+        if (st === 'completed') {
+          const jobRes  = await fetch(`https://cloud.comfy.org/api/jobs/${ccId}`, {
+            headers: { 'X-API-Key': COMFYCLOUD_API_KEY }
+          })
+          const jobData = await jobRes.json()
+          const outputs = jobData.outputs || {}
+
+          const sexyFiles = []
+          for (const nodeOutputs of Object.values(outputs)) {
+            for (const img of (nodeOutputs.images || [])) {
+              if (/^ZSEXY\d+/.test(img.filename)) sexyFiles.push(img)
+            }
+          }
+          sexyFiles.sort((a, b) => {
+            const aNum = parseInt(a.filename.match(/ZSEXY(\d+)/)?.[1] || '0')
+            const bNum = parseInt(b.filename.match(/ZSEXY(\d+)/)?.[1] || '0')
+            return aNum - bNum
+          })
+
+          const sexyImages = await Promise.all(sexyFiles.map(async img => {
+            const viewRes = await fetch(
+              `https://cloud.comfy.org/api/view?filename=${encodeURIComponent(img.filename)}&subfolder=${encodeURIComponent(img.subfolder || '')}&type=output`,
+              { headers: { 'X-API-Key': COMFYCLOUD_API_KEY }, redirect: 'manual' }
+            )
+            return viewRes.headers.get('location') || `https://cloud.comfy.org/api/view?filename=${encodeURIComponent(img.filename)}&type=output`
+          }))
+
+          console.log(`  [CC-SEXY] sexyImages: ${sexyImages.length}`)
+          return json(res, 200, { status: 'success', sexyImages })
+        }
+        if (['error', 'cancelled'].includes(st)) {
+          return json(res, 200, { status: 'error', message: statusData.error_message || st })
+        }
+        return json(res, 200, { status: 'running' })
+      }
 
       // ── ComfyDeploy Content run (prefijo cdc:) ───────────────────────────
       if (runId.startsWith('cdc:')) {
