@@ -1,4 +1,4 @@
-# Zami AI Studio — Documentación Técnica v11 — 4 Toggles + Claude Intensity Mapping
+# Zami AI Studio — Documentación Técnica v12 — 2-Week Auto-Generation + Skeleton UI
 
 ## REGLA ABSOLUTA — COMANDOS SIEMPRE COMPLETOS
 
@@ -656,7 +656,7 @@ VITE_FAL_API_KEY=
 | 2 | Body params directos (Modo Manual) | 7 enums directo al workflow, body_description como brief_text | ✅ Operativo |
 | 3 | Generación de Cuerpo | Integrado en `e833a575` (AionBodyReferenceNode nodo 227) | ✅ Operativo |
 | 4 | Perfil AI Persona | Anthropic `claude-sonnet-4-6` | ✅ Operativo |
-| Fase 4 | Contenido UGC Semanal — 8 imágenes | Claude plan + ComfyDeploy `f9822b81` (14 slots, 8 usados) | ✅ Operativo |
+| Fase 4 | Contenido UGC — 2 semanas × 8 imágenes | Claude plan ×2 + ComfyDeploy `f9822b81` ×2 (14 slots, 8 usados) | ✅ Operativo (requiere créditos ComfyDeploy) |
 | Fase 4B | Contenido Sexy (flujo viejo) — eliminado de UI | ComfyDeploy `5eb42961` — roto, reemplazado por Fase 4C | 🗑 Eliminado del UI |
 | Fase 4C | Botón "✦ Más Sexy" por foto — 10 imágenes | ComfyUI Cloud `cloud.comfy.org` + `data/workflow-sexy-contexto.json` (versión 7-6) | ✅ Operativo |
 | Fase 5 | Publicación | Por definir | ⏳ Pendiente |
@@ -1000,21 +1000,57 @@ COMFYCLOUD_API_KEY=comfyui-<key-activa>   # Generar en https://platform.comfy.or
 
 **Contenido UGC (Fase 4) da 404 "Workflow not found":** El `VITE_COMFYDEPLOY_CONTENT_DEPLOYMENT_ID` en `.env` apunta a un deployment eliminado. Cambiarlo a `f9822b81-9ebc-48e2-b39c-0e8034e90554` y reiniciar.
 
-### ESTADO AL CIERRE DE SESIÓN (2026-06-07)
+### ESTADO AL CIERRE DE SESIÓN (2026-06-07) — v12
 
-**Hecho en esta sesión:**
-- ✅ Workflow actualizado a versión 7-6 (`data/workflow-sexy-contexto.json`) — nodos 785+789+791+676+10×Seedream
-- ✅ COMFYCLOUD_API_KEY actualizada con key activa
-- ✅ Flujo `ccsx:` funcionando correctamente (ComfyUI Cloud genera ZSEXY1-ZSEXY10)
-- ✅ Eliminada sección "CONTENIDO SEXY INSTAGRAM" del UI (era redundante)
-- ✅ Eliminados endpoints legacy `/api/generate-sexy-content-plan` y `/api/generate-sexy-content-day`
-- ✅ Eliminada función `startComfyDeploySexyContentRun` y `generateSexyContentPlan` del servidor
-- ✅ Agregado panel `#sexy-result-section` estático con 10 slots siempre en DOM (fix del bug de display)
-- ✅ Steps de progreso animados: Subiendo → Analizando → Generando 10 → Listo
-- ✅ Timer de elapsed time durante generación
-- ✅ Thumbnail de imagen de contexto en el panel sexy
+**Hecho en sesión anterior (v11 → UI cleanup + Fase 4C fix):**
+- ✅ Workflow sexy actualizado a versión 7-6 (`data/workflow-sexy-contexto.json`)
+- ✅ Flujo `ccsx:` operativo (ComfyUI Cloud genera ZSEXY1-ZSEXY10)
+- ✅ Eliminada sección "CONTENIDO SEXY INSTAGRAM" (era redundante)
+- ✅ Panel `#sexy-result-section` estático con 10 slots + steps animados + timer + thumbnail
 
-**Flujo activo único para contenido sexy:**
-Clic en "✦ Más Sexy" sobre cualquier foto de contenido UGC → panel sexy aparece → 3 imágenes se suben → workflow ComfyUI Cloud genera 10 fotos en el mismo contexto → aparecen en grid 5×2
+**Hecho en esta sesión (v12 — 2-Week Auto-Generation + Skeleton UI):**
+- ✅ Fix ComfyUI error "Field 'prompt' cannot be empty" en node 700: nodo 678 ahora lee directo de 676 (bypassea Text Multiline fallido)
+- ✅ Instrucción anti-asterisk agregada al system_prompt del nodo 676 (evita que Claude use `*` dentro del texto de un prompt)
+- ✅ Nuevo endpoint `/api/generate-content-2weeks` en `server.cjs` (secuencial server-side, no usado actualmente por UI pero disponible)
+- ✅ Reemplazado botón "Generar Plan Semanal" + "Generar 8 Imágenes" por botón único **"✦ Generar 2 Semanas de Contenido"**
+- ✅ Auto-generación: al crear el plan, el run de ComfyDeploy se lanza automáticamente (sin segundo clic)
+- ✅ 2 semanas simultáneas: Week 1 plan → Week 1 run → Week 2 plan → Week 2 run → poll ambos concurrentes
+- ✅ Skeleton shimmer en 16 slots (8 por semana) aparecen inmediatamente
+- ✅ Badges de estado por semana: Pendiente → Planificando → Generando → Listo (con animación pulse)
+- ✅ Timer de elapsed time por semana
+- ✅ Toast notifications en completion/error
+- ✅ Hover overlay con caption preview sobre cada imagen
+- ✅ Animación `img-appear` al cargar cada imagen
+- ✅ Grid 4 columnas fijo (era auto-fill minmax 280px)
+- ✅ Botón "Guardar Semana 1" / "Guardar Semana 2" independientes
+- ✅ Toast container en DOM (`#toast-container`)
+- ✅ Commit `03a8a3f` pusheado a GitHub main
 
-**Fase 4B eliminada del UI.** El deployment `5eb42961` sigue roto pero ya no es relevante.
+**Prueba realizada:**
+- El payload de contenido llegó correcto al servidor (face_url, body_url, 8 prompts con formato correcto)
+- ComfyDeploy retornó 403 "Insufficient deployment owner's GPU credits" — NO es bug de código, es créditos agotados en la cuenta ComfyDeploy
+- **Pendiente:** recargar créditos en app.comfydeploy.com/settings/billing y repetir prueba completa
+
+**IDs de slots en la nueva UI:**
+- Semana 1: `slot-w1-1` … `slot-w1-8`, `caption-w1-1` … `caption-w1-8`, `prompt-w1-1` … `prompt-w1-8`
+- Semana 2: `slot-w2-1` … `slot-w2-8`, `caption-w2-1` … `caption-w2-8`, `prompt-w2-1` … `prompt-w2-8`
+- Week sections: `#week-section-1`, `#week-section-2`
+- Status badges: `#week-status-1`, `#week-status-2` (clases: `wsb-pending/planning/generating/done/error`)
+- Elapsed timers: `#week-elapsed-1`, `#week-elapsed-2`
+- Save buttons: `#btn-save-week-1`, `#btn-save-week-2`
+
+**Flujo Fase 4 (nuevo):**
+```
+1 clic "✦ Generar 2 Semanas" →
+  Skeleton aparece para ambas semanas
+  → POST /api/generate-content-plan (semana 1, ~45s)
+  → POST /api/generate-content-day (semana 1) → lastContentRunId1
+  → POST /api/generate-content-plan (semana 2, historia incluye semana 1)
+  → POST /api/generate-content-day (semana 2) → lastContentRunId2
+  → Promise.allSettled([pollWeekContentRun(1), pollWeekContentRun(2)])
+  → renderWeekImages(imgs, weekNum) al completar cada run
+  → toast "Semana N lista" + badge "Listo" + botón "Guardar"
+```
+
+**Flujo Fase 4C (sin cambios):**
+Clic "✦ Más Sexy" sobre cualquier foto → panel `#sexy-result-section` → 3 uploads ComfyUI Cloud → 10 fotos ZSEXY1-ZSEXY10 → grid 5×2
