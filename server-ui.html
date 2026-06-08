@@ -342,6 +342,7 @@
   }
   .slot-skeleton-label { font-size: 0.65rem; color: #444; letter-spacing: 0.04em; text-transform: uppercase }
 
+  .wc-steps { display: flex; align-items: center; gap: 0; flex-wrap: wrap; padding: 7px 16px; background: #0d0d0d; border-left: 1px solid #2a2a2a; border-right: 1px solid #2a2a2a; }
   .week-section { margin-top: 20px }
   .week-header-bar {
     display: flex; align-items: center; gap: 10px;
@@ -1010,6 +1011,15 @@
       <span class="week-status-badge wsb-pending" id="week-status-1">Pendiente</span>
       <span class="week-elapsed" id="week-elapsed-1"></span>
     </div>
+    <div class="wc-steps" id="wc-steps-1">
+      <span id="wcstep-plan-1" class="sx-step sx-step-pending">✦ Planificando</span>
+      <span class="sx-sep">→</span>
+      <span id="wcstep-send-1" class="sx-step sx-step-pending">Enviando</span>
+      <span class="sx-sep">→</span>
+      <span id="wcstep-gen-1"  class="sx-step sx-step-pending">Generando</span>
+      <span class="sx-sep">→</span>
+      <span id="wcstep-done-1" class="sx-step sx-step-pending">Listo</span>
+    </div>
     <div class="week-grid-wrap">
       <div class="calendar-grid" id="week-calendar-1"></div>
       <div class="week-save-bar">
@@ -1026,6 +1036,15 @@
       <span class="week-theme-label" id="week-theme-2">Esperando Semana 1...</span>
       <span class="week-status-badge wsb-pending" id="week-status-2">Pendiente</span>
       <span class="week-elapsed" id="week-elapsed-2"></span>
+    </div>
+    <div class="wc-steps" id="wc-steps-2">
+      <span id="wcstep-plan-2" class="sx-step sx-step-pending">✦ Planificando</span>
+      <span class="sx-sep">→</span>
+      <span id="wcstep-send-2" class="sx-step sx-step-pending">Enviando</span>
+      <span class="sx-sep">→</span>
+      <span id="wcstep-gen-2"  class="sx-step sx-step-pending">Generando</span>
+      <span class="sx-sep">→</span>
+      <span id="wcstep-done-2" class="sx-step sx-step-pending">Listo</span>
     </div>
     <div class="week-grid-wrap">
       <div class="calendar-grid" id="week-calendar-2"></div>
@@ -2182,11 +2201,25 @@ async function pollWeekContentRun(runId, weekNum, deadline = Date.now() + 1_200_
       const data = await res.json()
 
       if (data.status === 'success') {
+        setWcStep(weekNum, 'gen', 'done')
+        setWcStep(weekNum, 'done', 'done')
         renderWeekImages(data.contentImages, weekNum)
         return
       }
 
+      if (data.status === 'partial') {
+        // Render whatever ComfyDeploy completed before the failure
+        renderWeekImages(data.contentImages, weekNum)
+        setWcStep(weekNum, 'gen', 'error')
+        const err = new Error(`${data.contentImages.length}/8 generadas`)
+        err.isPartialError = true
+        err.partialCount   = data.contentImages.length
+        throw err
+      }
+
       if (data.status === 'error') {
+        setWcStep(weekNum, 'gen', 'error')
+        setWcStep(weekNum, 'done', 'error')
         for (let i = 1; i <= 8; i++) {
           const slotEl = document.getElementById(`slot-w${weekNum}-${i}`)
           if (slotEl) slotEl.innerHTML = `<div class="slot-placeholder" style="color:#f87171">${escHtml(data.message || 'error')}</div>`
@@ -2196,7 +2229,7 @@ async function pollWeekContentRun(runId, weekNum, deadline = Date.now() + 1_200_
         throw err
       }
     } catch (err) {
-      if (err.isPollingError) throw err
+      if (err.isPollingError || err.isPartialError) throw err
       console.warn(`poll week${weekNum} error:`, err.message)
     }
   }
@@ -2206,11 +2239,22 @@ async function pollWeekContentRun(runId, weekNum, deadline = Date.now() + 1_200_
     const tRes  = await fetch(`/api/status/${runId}`)
     const tData = await tRes.json()
     if (tData.status === 'success' && tData.contentImages?.length) {
+      setWcStep(weekNum, 'gen', 'done')
+      setWcStep(weekNum, 'done', 'done')
       renderWeekImages(tData.contentImages, weekNum)
       return
     }
-  } catch {}
+    if (tData.status === 'partial' && tData.contentImages?.length) {
+      renderWeekImages(tData.contentImages, weekNum)
+      setWcStep(weekNum, 'gen', 'error')
+      const err = new Error(`${tData.contentImages.length}/8 generadas`)
+      err.isPartialError = true
+      err.partialCount   = tData.contentImages.length
+      throw err
+    }
+  } catch (e) { if (e.isPartialError || e.isPollingError) throw e }
 
+  setWcStep(weekNum, 'gen', 'error')
   for (let i = 1; i <= 8; i++) {
     const slotEl = document.getElementById(`slot-w${weekNum}-${i}`)
     if (slotEl) slotEl.innerHTML = '<div class="slot-placeholder" style="color:#f87171">Timeout</div>'
@@ -2218,6 +2262,42 @@ async function pollWeekContentRun(runId, weekNum, deadline = Date.now() + 1_200_
   const err = new Error(`Timeout generando imágenes semana ${weekNum}`)
   err.isPollingError = true
   throw err
+}
+
+// ── Auto-retry wrapper: re-sends the run once on partial failure ──────────
+async function pollWithRetry(runId, weekNum, faceUrl, bodyUrl, prompts) {
+  try {
+    await pollWeekContentRun(runId, weekNum)
+  } catch (err) {
+    if (!err.isPartialError) throw err
+
+    showToast(`Semana ${weekNum}: ${err.partialCount}/8 — reintentando automáticamente...`, 'warning')
+    setWcStep(weekNum, 'gen', 'pending')
+    setWcStep(weekNum, 'send', 'active')
+    try {
+      const cr = await fetch('/api/generate-content-day', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ face_url: faceUrl, body_url: bodyUrl, prompts }),
+      })
+      const cd = await cr.json()
+      if (!cr.ok || cd.error) throw new Error(cd.error || `Retry HTTP ${cr.status}`)
+      setWcStep(weekNum, 'send', 'done')
+      setWcStep(weekNum, 'gen', 'active')
+      await pollWeekContentRun(cd.runId, weekNum)
+    } catch (retryErr) {
+      if (retryErr.isPartialError) {
+        // Second partial: accept what we have, surface as incomplete
+        setWeekStatus(weekNum, 'error', `Incompleta ${retryErr.partialCount}/8`)
+        document.getElementById(`btn-save-week-${weekNum}`).style.display = 'block'
+        showToast(`Semana ${weekNum}: ${retryErr.partialCount}/8 imágenes disponibles`, 'warning')
+        const done = new Error(`Incompleta ${retryErr.partialCount}/8`)
+        done.isPartialHandled = true
+        throw done
+      }
+      throw retryErr
+    }
+  }
 }
 
 // ── Main: generate 2 weeks sequentially ───────────────────────────────────
@@ -2232,7 +2312,7 @@ async function generateContent2Weeks() {
   btn.disabled = true
   generatedPersonaText = getCurrentPersonaText()
 
-  // Show both week sections with skeleton
+  // Show both week sections with skeleton + reset all wcsteps to pending
   ;[1, 2].forEach(wn => {
     const sec = document.getElementById(`week-section-${wn}`)
     if (sec) sec.style.display = 'block'
@@ -2241,6 +2321,7 @@ async function generateContent2Weeks() {
     document.getElementById(`btn-save-week-${wn}`).style.display = 'none'
     document.getElementById(`week-save-status-${wn}`).textContent = ''
     document.getElementById(`week-elapsed-${wn}`).textContent = ''
+    ;['plan','send','gen','done'].forEach(s => setWcStep(wn, s, 'pending'))
   })
 
   document.getElementById('week-section-1').scrollIntoView({ behavior: 'smooth', block: 'start' })
@@ -2252,6 +2333,7 @@ async function generateContent2Weeks() {
   // ── Week 1: plan + run ─────────────────────────────────────────────────
   try {
     setWeekStatus(1, 'planning', 'Diseñando plan...')
+    setWcStep(1, 'plan', 'active')
     startWeekTimer(1)
 
     const r1 = await fetch('/api/generate-content-plan', {
@@ -2260,11 +2342,14 @@ async function generateContent2Weeks() {
       body: JSON.stringify({ persona: generatedPersonaText, nombre, nicho, face_url: generatedFaceUrl || '', body_url: generatedBodyUrl || '', week_history: weekHistory }),
     })
     const d1 = await r1.json()
-    if (!r1.ok || d1.error) throw new Error(d1.error || `HTTP ${r1.status}`)
+    if (!r1.ok || d1.error) { setWcStep(1, 'plan', 'error'); throw new Error(d1.error || `HTTP ${r1.status}`) }
 
     currentContentPlan = d1.plan
     currentContentPlan1 = d1.plan
     renderWeekCalendar(1, d1.plan)
+    setWcStep(1, 'plan', 'done')
+    setWcStep(1, 'send', 'active')
+    setWeekStatus(1, 'generating', d1.plan.theme)
 
     const prompts1 = d1.plan.week.map(w => w.prompt || '')
     const cr1 = await fetch('/api/generate-content-day', {
@@ -2273,12 +2358,15 @@ async function generateContent2Weeks() {
       body: JSON.stringify({ face_url: generatedFaceUrl, body_url: generatedBodyUrl, prompts: prompts1 }),
     })
     const cd1 = await cr1.json()
-    if (!cr1.ok || cd1.error) throw new Error(cd1.error || `HTTP ${cr1.status}`)
+    if (!cr1.ok || cd1.error) { setWcStep(1, 'send', 'error'); throw new Error(cd1.error || `HTTP ${cr1.status}`) }
     lastContentRunId1 = cd1.runId
     lastContentRunId  = cd1.runId
+    setWcStep(1, 'send', 'done')
+    setWcStep(1, 'gen', 'active')
 
     // ── Week 2: plan (sequential so it knows week 1 theme) ─────────────
     setWeekStatus(2, 'planning', 'Diseñando plan Semana 2...')
+    setWcStep(2, 'plan', 'active')
     startWeekTimer(2)
     const extHistory = [...weekHistory, { theme: d1.plan.theme, summary: d1.plan.summary || '' }]
 
@@ -2288,10 +2376,13 @@ async function generateContent2Weeks() {
       body: JSON.stringify({ persona: generatedPersonaText, nombre, nicho, face_url: generatedFaceUrl || '', body_url: generatedBodyUrl || '', week_history: extHistory }),
     })
     const d2 = await r2.json()
-    if (!r2.ok || d2.error) throw new Error(d2.error || `HTTP ${r2.status}`)
+    if (!r2.ok || d2.error) { setWcStep(2, 'plan', 'error'); throw new Error(d2.error || `HTTP ${r2.status}`) }
 
     currentContentPlan2 = d2.plan
     renderWeekCalendar(2, d2.plan)
+    setWcStep(2, 'plan', 'done')
+    setWcStep(2, 'send', 'active')
+    setWeekStatus(2, 'generating', d2.plan.theme)
 
     const prompts2 = d2.plan.week.map(w => w.prompt || '')
     const cr2 = await fetch('/api/generate-content-day', {
@@ -2300,37 +2391,37 @@ async function generateContent2Weeks() {
       body: JSON.stringify({ face_url: generatedFaceUrl, body_url: generatedBodyUrl, prompts: prompts2 }),
     })
     const cd2 = await cr2.json()
-    if (!cr2.ok || cd2.error) throw new Error(cd2.error || `HTTP ${cr2.status}`)
+    if (!cr2.ok || cd2.error) { setWcStep(2, 'send', 'error'); throw new Error(cd2.error || `HTTP ${cr2.status}`) }
     lastContentRunId2 = cd2.runId
+    setWcStep(2, 'send', 'done')
+    setWcStep(2, 'gen', 'active')
 
     setContentPlanStatus('Planes generados. Imágenes en progreso...', 'success')
     btn.disabled = false
 
-    // ── Poll both weeks concurrently ───────────────────────────────────
-    const poll1 = pollWeekContentRun(cd1.runId, 1).then(() => {
+    // ── Poll both weeks concurrently (with auto-retry on partial) ─────
+    const poll1 = pollWithRetry(cd1.runId, 1, generatedFaceUrl, generatedBodyUrl, prompts1).then(() => {
       stopWeekTimer(1)
       setWeekStatus(1, 'done', d1.plan.theme)
       document.getElementById('btn-save-week-1').style.display = 'block'
-      showToast('Semana 1 lista — 8 imágenes generadas', 'success')
+      showToast('Semana 1 lista', 'success')
     }).catch(err => {
       stopWeekTimer(1)
-      setWeekStatus(1, 'error')
-      showToast(`Semana 1 error: ${err.message}`, 'error')
+      if (!err.isPartialHandled) { setWeekStatus(1, 'error'); showToast(`Semana 1: ${err.message}`, 'error') }
     })
 
-    const poll2 = pollWeekContentRun(cd2.runId, 2).then(() => {
+    const poll2 = pollWithRetry(cd2.runId, 2, generatedFaceUrl, generatedBodyUrl, prompts2).then(() => {
       stopWeekTimer(2)
       setWeekStatus(2, 'done', d2.plan.theme)
       document.getElementById('btn-save-week-2').style.display = 'block'
-      showToast('Semana 2 lista — 8 imágenes generadas', 'success')
+      showToast('Semana 2 lista', 'success')
     }).catch(err => {
       stopWeekTimer(2)
-      setWeekStatus(2, 'error')
-      showToast(`Semana 2 error: ${err.message}`, 'error')
+      if (!err.isPartialHandled) { setWeekStatus(2, 'error'); showToast(`Semana 2: ${err.message}`, 'error') }
     })
 
     await Promise.allSettled([poll1, poll2])
-    setContentPlanStatus('Generación completa — 16 imágenes listas.', 'success')
+    setContentPlanStatus('Generación completa.', 'success')
 
   } catch (err) {
     btn.disabled = false
@@ -2357,6 +2448,11 @@ async function downloadImage(url, filename) {
 let _sexyElapsedTimer = null
 function setSxStep(id, state) {
   const el = document.getElementById(id)
+  if (!el) return
+  el.className = `sx-step sx-step-${state}`
+}
+function setWcStep(weekNum, stepId, state) {
+  const el = document.getElementById(`wcstep-${stepId}-${weekNum}`)
   if (!el) return
   el.className = `sx-step sx-step-${state}`
 }

@@ -1500,14 +1500,27 @@ const server = http.createServer(async (req, res) => {
             headers: { 'X-API-Key': COMFYCLOUD_API_KEY }
           })
           const jobData = await jobRes.json()
+          console.log('[CC-SEXY OUTPUTS RAW]', JSON.stringify(jobData, null, 2))
           const outputs = jobData.outputs || {}
 
           const sexyFiles = []
+          // Handle standard ComfyUI node-keyed outputs: { nodeId: { images: [{filename, subfolder}] } }
           for (const nodeOutputs of Object.values(outputs)) {
-            for (const img of (nodeOutputs.images || [])) {
-              if (/^ZSEXY\d+/.test(img.filename)) sexyFiles.push(img)
+            if (!nodeOutputs || typeof nodeOutputs !== 'object') continue
+            const images = nodeOutputs.images || nodeOutputs.imgs || []
+            for (const img of images) {
+              if (!img) continue
+              if (typeof img === 'string') {
+                // URL string format — extract filename from URL
+                const fname = img.split('/').pop().split('?')[0]
+                if (/ZSEXY\d+/.test(fname)) sexyFiles.push({ filename: fname, subfolder: '', _url: img })
+              } else if (img.filename && /^ZSEXY\d+/.test(img.filename)) {
+                sexyFiles.push(img)
+              }
             }
           }
+          console.log('[CC-SEXY FILES FOUND]', sexyFiles.length, sexyFiles.map(f => f.filename))
+
           sexyFiles.sort((a, b) => {
             const aNum = parseInt(a.filename.match(/ZSEXY(\d+)/)?.[1] || '0')
             const bNum = parseInt(b.filename.match(/ZSEXY(\d+)/)?.[1] || '0')
@@ -1515,6 +1528,7 @@ const server = http.createServer(async (req, res) => {
           })
 
           const sexyImages = await Promise.all(sexyFiles.map(async img => {
+            if (img._url) return img._url
             const viewRes = await fetch(
               `https://cloud.comfy.org/api/view?filename=${encodeURIComponent(img.filename)}&subfolder=${encodeURIComponent(img.subfolder || '')}&type=output`,
               { headers: { 'X-API-Key': COMFYCLOUD_API_KEY }, redirect: 'manual' }
@@ -1554,7 +1568,19 @@ const server = http.createServer(async (req, res) => {
         }
         if (['failed', 'cancelled', 'timeout'].includes(st)) {
           console.log(`[CDC-ERROR] ${cdcId} -> ${st}`)
-          console.log(`[CDC-ERROR] full response:`, JSON.stringify(data, null, 2))
+          // Try to salvage partial images before declaring failure
+          const partialRaw = extractImages(data.outputs)
+          const contentImages = partialRaw
+            .filter(u => /\/ZCS\d+[_]/.test(u) || /[?&]file=ZCS\d+/.test(u) || u.split('/').pop().startsWith('ZCS'))
+            .sort((a, b) => {
+              const aNum = parseInt(a.split('/').pop().match(/ZCS(\d+)/)?.[1] || '0')
+              const bNum = parseInt(b.split('/').pop().match(/ZCS(\d+)/)?.[1] || '0')
+              return aNum - bNum
+            })
+          console.log(`[CDC-PARTIAL] ${contentImages.length}/8 imágenes recuperadas de run fallido`)
+          if (contentImages.length > 0) {
+            return json(res, 200, { status: 'partial', contentImages, failedCount: 8 - contentImages.length, message: st })
+          }
           return json(res, 200, { status: 'error', message: st })
         }
         return json(res, 200, { status: 'running' })
