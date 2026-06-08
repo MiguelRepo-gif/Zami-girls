@@ -53,6 +53,53 @@ const MAX_UPLOAD_BYTES      = 8 * 1024 * 1024
 const ALLOWED_IMAGE_TYPES   = new Set(['image/jpeg', 'image/png', 'image/webp'])
 const IMAGE_EXTENSIONS      = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' }
 let influencerWriteQueue    = Promise.resolve()
+const CC_SEXY_POLL_MS = 3000
+const CC_SEXY_OUTPUT_WAIT_LIMIT = 10
+const CC_SEXY_EMPTY_PROMPT_MAX_RETRIES = 2
+const comfyCloudSexyRuns = new Map()
+
+function isEmptyPromptError(message) {
+  if (!message) return false
+  return String(message).includes("Field 'prompt' cannot be empty")
+}
+
+function nowIso() {
+  return new Date().toISOString()
+}
+
+function sanitizeLoneSurrogates(value) {
+  const s = String(value)
+  let out = ''
+  for (let i = 0; i < s.length; i++) {
+    const code = s.charCodeAt(i)
+    if (code >= 0xD800 && code <= 0xDBFF) {
+      const next = s.charCodeAt(i + 1)
+      if (next >= 0xDC00 && next <= 0xDFFF) {
+        out += s[i] + s[i + 1]
+        i++
+      }
+      continue
+    }
+    if (code >= 0xDC00 && code <= 0xDFFF) continue
+    out += s[i]
+  }
+  return out
+}
+
+function sanitizeForJson(value) {
+  if (typeof value === 'string') return sanitizeLoneSurrogates(value)
+  if (Array.isArray(value)) return value.map(sanitizeForJson)
+  if (value && typeof value === 'object') {
+    const clean = {}
+    for (const [key, val] of Object.entries(value)) clean[key] = sanitizeForJson(val)
+    return clean
+  }
+  return value
+}
+
+function safeJsonStringify(value) {
+  return JSON.stringify(sanitizeForJson(value))
+}
 
 // ── Influencers persistence ──────────────────────────────────────────────────
 function loadInfluencers() {
@@ -178,7 +225,223 @@ async function uploadToComfyCloud(imageUrl) {
   return data.name
 }
 
-async function startComfyCloudSexyRun(faceUrl, bodyUrl, contextoUrl) {
+function pushCcSexyLog(run, event, details = {}) {
+  if (!run) return
+  run.logs.push({ at: nowIso(), event, ...details })
+  if (run.logs.length > 40) run.logs.splice(0, run.logs.length - 40)
+  const suffix = Object.keys(details).length ? ` ${JSON.stringify(details)}` : ''
+  console.log(`[CC-SEXY-MONITOR] ${run.id} ${event}${suffix}`)
+}
+
+function parseComfyCloudErrorMessage(raw) {
+  if (!raw) return ''
+  try {
+    const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw
+    return parsed.exception_message || parsed.message || String(raw)
+  } catch {
+    return String(raw)
+  }
+}
+
+async function comfyCloudJson(apiPath) {
+  const res = await fetch(`https://cloud.comfy.org${apiPath}`, {
+    headers: { 'X-API-Key': COMFYCLOUD_API_KEY },
+  })
+  const text = await res.text()
+  let body
+  try { body = text ? JSON.parse(text) : {} }
+  catch { body = { raw: text } }
+  return { ok: res.ok, status: res.status, body }
+}
+
+async function resolveComfyCloudViewUrl(img) {
+  if (img._url) return img._url
+  const params = new URLSearchParams({
+    filename: img.filename,
+    subfolder: img.subfolder || '',
+    type: img.type || 'output',
+  })
+  const viewRes = await fetch(`https://cloud.comfy.org/api/view?${params}`, {
+    headers: { 'X-API-Key': COMFYCLOUD_API_KEY },
+    redirect: 'manual',
+  })
+  const redirectUrl = viewRes.headers.get('location')
+  if (redirectUrl) return redirectUrl
+  if (viewRes.ok && viewRes.url) return viewRes.url
+  return null
+}
+
+async function extractComfyCloudSexyImages(jobData) {
+  const outputs = jobData.outputs || {}
+  const sexyFiles = []
+  for (const nodeOutputs of Object.values(outputs)) {
+    if (!nodeOutputs || typeof nodeOutputs !== 'object') continue
+    const images = nodeOutputs.images || nodeOutputs.imgs || []
+    for (const img of images) {
+      if (!img) continue
+      if (typeof img === 'string') {
+        const fname = img.split('/').pop().split('?')[0]
+        if (/ZSEXY\d+/.test(fname)) sexyFiles.push({ filename: fname, display_name: fname, subfolder: '', type: 'output', _url: img })
+      } else if (img.filename) {
+        const displayName = img.display_name || img.filename
+        if (/ZSEXY\d+/.test(displayName)) {
+          sexyFiles.push({
+            filename: img.filename,
+            display_name: displayName,
+            subfolder: img.subfolder || '',
+            type: img.type || 'output',
+          })
+        }
+      }
+    }
+  }
+
+  sexyFiles.sort((a, b) => {
+    const aKey = a.display_name || a.filename
+    const bKey = b.display_name || b.filename
+    const aNum = parseInt(aKey.match(/ZSEXY(\d+)/)?.[1] || '0')
+    const bNum = parseInt(bKey.match(/ZSEXY(\d+)/)?.[1] || '0')
+    return aNum - bNum
+  })
+
+  const sexyImages = (await Promise.all(sexyFiles.map(resolveComfyCloudViewUrl))).filter(Boolean)
+  return { sexyFiles, sexyImages }
+}
+
+function publicCcSexyStatus(run) {
+  return {
+    status: run.status,
+    runId: 'ccsx:' + run.id,
+    message: run.message,
+    cloudStatus: run.cloudStatus || null,
+    queueRemaining: run.queueRemaining ?? null,
+    retryCount: run.retryCount || 0,
+    maxRetries: CC_SEXY_EMPTY_PROMPT_MAX_RETRIES,
+    pollMs: CC_SEXY_POLL_MS,
+    updatedAt: run.updatedAt,
+    sexyImages: run.sexyImages || undefined,
+    logs: run.logs.slice(-12),
+  }
+}
+
+function stopCcSexyMonitor(run) {
+  if (run && run.timer) {
+    clearInterval(run.timer)
+    run.timer = null
+  }
+}
+
+async function retryComfyCloudSexyRun(run, reason) {
+  if (run.retryCount >= CC_SEXY_EMPTY_PROMPT_MAX_RETRIES) {
+    run.status = 'error'
+    run.message = `${reason}; retry limit reached (${run.retryCount}/${CC_SEXY_EMPTY_PROMPT_MAX_RETRIES})`
+    run.updatedAt = nowIso()
+    stopCcSexyMonitor(run)
+    pushCcSexyLog(run, 'retry-limit', { reason })
+    return
+  }
+  const nextRetry = run.retryCount + 1
+  pushCcSexyLog(run, 'retry-start', { reason, nextRetry })
+  stopCcSexyMonitor(run)
+  const retryRunId = await startComfyCloudSexyRun(run.faceUrl, run.bodyUrl, run.contextoUrl, nextRetry)
+  run.status = 'retrying'
+  run.message = `ComfyUI Cloud devolvio un prompt vacio; reintentando (${nextRetry}/${CC_SEXY_EMPTY_PROMPT_MAX_RETRIES})`
+  run.nextRunId = retryRunId
+  run.updatedAt = nowIso()
+}
+
+async function pollComfyCloudSexyRun(ccId) {
+  const run = comfyCloudSexyRuns.get(ccId)
+  if (!run || run.polling || ['success', 'error', 'retrying'].includes(run.status)) return
+  run.polling = true
+  try {
+    const queueRes = await comfyCloudJson('/api/prompt')
+    if (queueRes.ok) run.queueRemaining = queueRes.body?.exec_info?.queue_remaining ?? null
+
+    const statusRes = await comfyCloudJson(`/api/job/${ccId}/status`)
+    if (!statusRes.ok) {
+      run.status = statusRes.status >= 500 ? 'running' : 'error'
+      run.message = statusRes.status >= 500 ? `ComfyUI Cloud temporal ${statusRes.status}; reintentando monitor` : `ComfyUI Cloud API error ${statusRes.status}`
+      run.updatedAt = nowIso()
+      pushCcSexyLog(run, 'status-http-error', { http: statusRes.status })
+      if (run.status === 'error') stopCcSexyMonitor(run)
+      return
+    }
+
+    const statusData = statusRes.body
+    const st = statusData.status || ''
+    run.cloudStatus = st
+    run.assignedInference = statusData.assigned_inference || null
+    run.lastStateUpdate = statusData.last_state_update || null
+    run.updatedAt = nowIso()
+    pushCcSexyLog(run, 'status', { cloudStatus: st, queueRemaining: run.queueRemaining })
+
+    if (['completed', 'success'].includes(st)) {
+      const jobRes = await comfyCloudJson(`/api/jobs/${ccId}`)
+      if (!jobRes.ok) {
+        run.status = 'running'
+        run.message = `Job terminado; esperando detalles (${jobRes.status})`
+        pushCcSexyLog(run, 'details-wait', { http: jobRes.status })
+        return
+      }
+      const jobData = jobRes.body
+      const { sexyFiles, sexyImages } = await extractComfyCloudSexyImages(jobData)
+      run.outputNames = sexyFiles.map(f => f.display_name || f.filename)
+      run.outputsCount = jobData.outputs_count || 0
+      pushCcSexyLog(run, 'outputs-check', { files: sexyFiles.length, urls: sexyImages.length, outputsCount: run.outputsCount })
+      if (sexyImages.length >= 10) {
+        run.status = 'success'
+        run.message = `10 imagenes resueltas: ${sexyImages.length}`
+        run.sexyImages = sexyImages.slice(0, 10)
+        run.updatedAt = nowIso()
+        stopCcSexyMonitor(run)
+        return
+      }
+      run.outputWaits = (run.outputWaits || 0) + 1
+      run.status = 'running'
+      run.message = `Cloud termino, esperando 10 outputs ZSEXY (${sexyImages.length}/10, chequeo ${run.outputWaits}/${CC_SEXY_OUTPUT_WAIT_LIMIT})`
+      if (run.outputWaits >= CC_SEXY_OUTPUT_WAIT_LIMIT) {
+        run.status = 'error'
+        run.message = `Cloud termino con ${sexyImages.length}/10 outputs ZSEXY tras ${CC_SEXY_OUTPUT_WAIT_LIMIT} chequeos`
+        stopCcSexyMonitor(run)
+      }
+      return
+    }
+
+    if (['error', 'failed', 'cancelled'].includes(st)) {
+      const message = parseComfyCloudErrorMessage(statusData.error_message || st)
+      pushCcSexyLog(run, 'terminal-error', { cloudStatus: st, message })
+      if (isEmptyPromptError(message)) {
+        await retryComfyCloudSexyRun(run, message.trim())
+        return
+      }
+      run.status = 'error'
+      run.message = message
+      run.updatedAt = nowIso()
+      stopCcSexyMonitor(run)
+      return
+    }
+
+    run.status = 'running'
+    run.message = `ComfyUI Cloud: ${st || 'running'}${run.queueRemaining !== null ? ` | cola: ${run.queueRemaining}` : ''}`
+  } catch (err) {
+    run.status = 'running'
+    run.message = `Monitor ComfyUI temporal: ${err.message}`
+    run.updatedAt = nowIso()
+    pushCcSexyLog(run, 'monitor-error', { message: err.message })
+  } finally {
+    run.polling = false
+  }
+}
+
+function startCcSexyMonitor(ccId) {
+  const run = comfyCloudSexyRuns.get(ccId)
+  if (!run || run.timer) return
+  run.timer = setInterval(() => { pollComfyCloudSexyRun(ccId).catch(err => pushCcSexyLog(run, 'monitor-crash', { message: err.message })) }, CC_SEXY_POLL_MS)
+  pollComfyCloudSexyRun(ccId).catch(err => pushCcSexyLog(run, 'monitor-crash', { message: err.message }))
+}
+
+async function startComfyCloudSexyRun(faceUrl, bodyUrl, contextoUrl, retryCount = 0) {
   if (!COMFYCLOUD_API_KEY) throw new Error('Agrega COMFYCLOUD_API_KEY en tu .env')
   if (!WORKFLOW_SEXY_CONTEXTO) throw new Error('No se encontró data/workflow-sexy-contexto.json')
 
@@ -203,6 +466,21 @@ async function startComfyCloudSexyRun(faceUrl, bodyUrl, contextoUrl) {
   if (!res.ok) throw new Error(`ComfyCloud prompt ${res.status}: ${await res.text()}`)
   const data = await res.json()
   console.log(`  [CC-SEXY] prompt_id: ${data.prompt_id}`)
+  comfyCloudSexyRuns.set(data.prompt_id, {
+    id: data.prompt_id,
+    faceUrl,
+    bodyUrl,
+    contextoUrl,
+    retryCount,
+    status: 'running',
+    message: 'Run enviado a ComfyUI Cloud; monitor activo cada 3s',
+    logs: [],
+    createdAt: nowIso(),
+    updatedAt: nowIso(),
+    outputWaits: 0,
+  })
+  pushCcSexyLog(comfyCloudSexyRuns.get(data.prompt_id), 'submitted', { retryCount, pollMs: CC_SEXY_POLL_MS })
+  startCcSexyMonitor(data.prompt_id)
   return 'ccsx:' + data.prompt_id
 }
 
@@ -383,7 +661,7 @@ Estructura exacta (llena cada "val" en español, creativamente, coherente con el
   ]}
 ]` })
 
-  const payload = JSON.stringify({
+  const payload = safeJsonStringify({
     model: ANTHROPIC_MODEL,
     max_tokens: 4000,
     messages: [{ role: 'user', content }],
@@ -443,7 +721,7 @@ The prompt MUST include ALL of the following with maximum specificity:
 
 Output ONLY the prompt text. No explanations, no quotes, no labels.`
 
-  const payload = JSON.stringify({
+  const payload = safeJsonStringify({
     model: ANTHROPIC_MODEL,
     max_tokens: 500,
     messages: [{ role: 'user', content: promptText }],
@@ -579,7 +857,7 @@ FORMATO: ÚNICAMENTE JSON válido. Sin markdown.
 Exactamente 8 objetos en "week", slots 1–8 en orden. Formatos obligatorios por slot:
 slot1=9:16, slot2=9:16, slot3=1:1, slot4=1:1, slot5=3:4, slot6=4:5, slot7=1:1, slot8=4:5` })
 
-  const payload = JSON.stringify({
+  const payload = safeJsonStringify({
     model: ANTHROPIC_MODEL,
     max_tokens: 8000,
     messages: [{ role: 'user', content }],
@@ -876,7 +1154,7 @@ async function generateAionParams(description, referenceImages, photoType, nombr
   const nichoHint = nicho ? `Content niche: ${nicho}\nInfluencer name: ${nombre || 'unknown'}\n\n` : ''
   content.push({ type: 'text', text: `${typeHint}${nichoHint}Influencer description: ${description}` })
 
-  const payload = JSON.stringify({
+  const payload = safeJsonStringify({
     model: ANTHROPIC_MODEL,
     max_tokens: 2000,
     system: AION_EXPERT_SYSTEM_PROMPT,
@@ -1520,69 +1798,25 @@ const server = http.createServer(async (req, res) => {
       // ComfyUI Cloud sexy run con contexto (prefijo ccsx:)
       if (runId.startsWith('ccsx:')) {
         const ccId = runId.slice(5)
-        const statusRes = await fetch(`https://cloud.comfy.org/api/job/${ccId}/status`, {
-          headers: { 'X-API-Key': COMFYCLOUD_API_KEY }
-        })
-        if (!statusRes.ok) {
-          if (statusRes.status >= 500) return json(res, 200, { status: 'running' })
-          return json(res, 200, { status: 'error', message: `ComfyCloud API error ${statusRes.status}` })
-        }
-        const statusData = await statusRes.json()
-        const st = statusData.status || ''
-        console.log(`[CC-SEXY-STATUS] ${ccId} -> ${st}`)
-        console.log('[CC-SEXY-STATUS-RAW]', JSON.stringify(statusData))
-
-        if (st === 'completed') {
-          const jobRes  = await fetch(`https://cloud.comfy.org/api/jobs/${ccId}`, {
-            headers: { 'X-API-Key': COMFYCLOUD_API_KEY }
+        if (!comfyCloudSexyRuns.has(ccId)) {
+          comfyCloudSexyRuns.set(ccId, {
+            id: ccId,
+            retryCount: CC_SEXY_EMPTY_PROMPT_MAX_RETRIES,
+            status: 'running',
+            message: 'Watcher read-only creado para run existente',
+            logs: [],
+            createdAt: nowIso(),
+            updatedAt: nowIso(),
+            outputWaits: 0,
           })
-          if (!jobRes.ok) return json(res, 200, { status: 'running' })
-          const jobData = await jobRes.json()
-          console.log('[CC-SEXY OUTPUTS RAW]', JSON.stringify(jobData, null, 2))
-          const outputs = jobData.outputs || {}
-
-          const sexyFiles = []
-          // Handle standard ComfyUI node-keyed outputs: { nodeId: { images: [{filename, subfolder}] } }
-          for (const nodeOutputs of Object.values(outputs)) {
-            if (!nodeOutputs || typeof nodeOutputs !== 'object') continue
-            const images = nodeOutputs.images || nodeOutputs.imgs || []
-            for (const img of images) {
-              if (!img) continue
-              if (typeof img === 'string') {
-                // URL string format — extract filename from URL
-                const fname = img.split('/').pop().split('?')[0]
-                if (/ZSEXY\d+/.test(fname)) sexyFiles.push({ filename: fname, subfolder: '', _url: img })
-              } else if (img.filename && /^ZSEXY\d+/.test(img.filename)) {
-                sexyFiles.push(img)
-              }
-            }
-          }
-          console.log('[CC-SEXY FILES FOUND]', sexyFiles.length, sexyFiles.map(f => f.filename))
-
-          sexyFiles.sort((a, b) => {
-            const aNum = parseInt(a.filename.match(/ZSEXY(\d+)/)?.[1] || '0')
-            const bNum = parseInt(b.filename.match(/ZSEXY(\d+)/)?.[1] || '0')
-            return aNum - bNum
-          })
-
-          const sexyImages = (await Promise.all(sexyFiles.map(async img => {
-            if (img._url) return img._url
-            const viewRes = await fetch(
-              `https://cloud.comfy.org/api/view?filename=${encodeURIComponent(img.filename)}&subfolder=${encodeURIComponent(img.subfolder || '')}&type=output`,
-              { headers: { 'X-API-Key': COMFYCLOUD_API_KEY }, redirect: 'follow' }
-            )
-            if (viewRes.ok && viewRes.url) return viewRes.url
-            return viewRes.headers.get('location') || null
-          }))).filter(Boolean)
-
-          console.log(`  [CC-SEXY] sexyImages resueltas: ${sexyImages.length}`)
-          if (sexyImages.length === 0) return json(res, 200, { status: 'running' })
-          return json(res, 200, { status: 'success', sexyImages })
+          pushCcSexyLog(comfyCloudSexyRuns.get(ccId), 'watch-existing', { pollMs: CC_SEXY_POLL_MS })
+          startCcSexyMonitor(ccId)
         }
-        if (['error', 'cancelled'].includes(st)) {
-          return json(res, 200, { status: 'error', message: statusData.error_message || st })
+        const monitoredRun = comfyCloudSexyRuns.get(ccId)
+        if (monitoredRun.status === 'retrying' && monitoredRun.nextRunId) {
+          return json(res, 200, { ...publicCcSexyStatus(monitoredRun), runId: monitoredRun.nextRunId })
         }
-        return json(res, 200, { status: 'running' })
+        return json(res, 200, publicCcSexyStatus(monitoredRun))
       }
 
       // ── ComfyDeploy Content run (prefijo cdc:) ───────────────────────────

@@ -1054,3 +1054,77 @@ COMFYCLOUD_API_KEY=comfyui-<key-activa>   # Generar en https://platform.comfy.or
 
 **Flujo Fase 4C (sin cambios):**
 Clic "✦ Más Sexy" sobre cualquier foto → panel `#sexy-result-section` → 3 uploads ComfyUI Cloud → 10 fotos ZSEXY1-ZSEXY10 → grid 5×2
+
+### ESTADO AL CIERRE DE SESION (2026-06-08) - v13
+
+**Objetivo de esta sesion:** dejar la automatizacion Fase 4C "Mas Sexy" documentada, actualizada en `main`, y lista para que otro chat continue sin perder contexto.
+
+**Estado operativo confirmado:**
+- La automatizacion local esta funcionando hasta donde se puede probar sin creditos de ComfyUI Cloud.
+- La prueba real de generacion de imagenes queda bloqueada por creditos agotados en ComfyUI Cloud. No diagnosticar esto como bug de codigo hasta recargar creditos y repetir la prueba.
+- No se debe tocar el prompt fisico del nodo de ComfyUI si el usuario indica que ya lo ajusto manualmente y genera bien.
+
+**Cambios tecnicos aplicados:**
+- `server.cjs` ahora monitorea runs `ccsx:` de ComfyUI Cloud cada 3 segundos con estado interno en memoria.
+- El branch `/api/status/:runId` para `ccsx:` ya no depende de un polling directo simple: crea/usa un watcher, consulta `/api/prompt`, `/api/job/{job_id}/status` y `/api/jobs/{job_id}`.
+- Estados terminales validos para exito: `completed` y `success`. La API documenta `completed`, pero en pruebas reales tambien aparecio `success`.
+- Al terminar un job, el servidor extrae imagenes desde `outputs[*].images`.
+- Para ordenar/filtrar las 10 imagenes se usa `display_name` con patron `ZSEXY\d+`, porque ComfyUI Cloud guarda el hash real en `filename`.
+- Para mostrar imagenes en UI se usa `filename` real contra `/api/view`, aceptando `302 Location` firmado.
+- El servidor solo devuelve `status: "success"` cuando tiene 10 URLs ZSEXY resueltas; si llegan menos, sigue esperando y luego devuelve error claro.
+- La UI `server-ui.html` mantiene polling Fase 4C cada 3 segundos y soporta `retrying` si el servidor cambia a un run nuevo.
+- Los payloads hacia Anthropic usan `safeJsonStringify()` para limpiar surrogates invalidos y evitar el error `Anthropic 400: no low surrogate in string`.
+
+**Workflow Fase 4C actual (`data/workflow-sexy-contexto.json`):**
+- Nodo 676: genera exactamente 10 prompts.
+- Nodo 676: `model.temperature` queda en `0.7`.
+- Separador mecanico vigente: `*`.
+- Nodo 678: `inputs.sep` queda en `*`.
+- No usar `|||ZAMI_PROMPT_SEPARATOR|||` en este workflow actual.
+- El error ComfyUI `Field 'prompt' cannot be empty` se produce cuando alguno de los 10 prompts queda vacio despues del split. La causa observada fue respuesta vacia o formato invalido desde el nodo Claude, no falta de imagen en la UI.
+
+**Limitacion de observabilidad ComfyUI Cloud:**
+- La API permite ver status, cola, job details, outputs, `execution_error`, `traceback`, `current_inputs`, `current_outputs`, `outputs_count`, workflow y metadata.
+- En el fallo observado con `ByteDanceSeedreamNodeV2` node 718 y `Field 'prompt' cannot be empty`, la API devolvio el error del nodo y `outputs_count: 0`.
+- La preview interna del nodo Claude en ComfyUI mostraba `Empty response from Claude model`, pero esa preview completa no aparecio como texto recuperable en la respuesta API del job fallido. Para ese dato se dependio de la captura/UI de ComfyUI.
+
+**Credito agotado - importante para el proximo chat:**
+- Actualmente no hay creditos suficientes en ComfyUI Cloud para lanzar una prueba end-to-end de imagenes Fase 4C.
+- Antes de probar "Mas Sexy" de punta a punta, recargar creditos en ComfyUI Cloud.
+- Despues de recargar, probar desde `http://127.0.0.1:3333`, boton `Mas Sexy`, y confirmar:
+  - el panel pasa por Subiendo / Analizando / Generando / Listo,
+  - el servidor loguea estados `CC-SEXY-MONITOR`,
+  - aparecen 10 URLs resueltas,
+  - la UI muestra las 10 imagenes,
+  - el polling se detiene,
+  - la descarga funciona.
+
+**Prompt para copiar y pegar en otro chat:**
+
+```text
+Estamos trabajando en C:\Users\LENOVO\zami-ai-studio-dev, proyecto Zami AI Studio. Lee primero CLAUDE.md y respeta la regla absoluta: cualquier comando que me entregues debe empezar con `cd C:\Users\LENOVO\zami-ai-studio-dev`.
+
+Estado actual al 2026-06-08:
+- La automatizacion Fase 4C "Mas Sexy" usa ComfyUI Cloud directo con `data/workflow-sexy-contexto.json`.
+- El workflow actual separa los 10 prompts con `*`, no con `|||ZAMI_PROMPT_SEPARATOR|||`.
+- Nodo 676: genera exactamente 10 prompts, `model.temperature = 0.7`.
+- Nodo 678: `inputs.sep = "*"`.
+- No tocar el prompt fisico del nodo ni el workflow si no es estrictamente necesario.
+- `server.cjs` ya tiene monitor para runs `ccsx:` cada 3 segundos usando API oficial ComfyUI Cloud:
+  - `/api/prompt`
+  - `/api/job/{job_id}/status`
+  - `/api/jobs/{job_id}`
+  - `/api/view`
+- La extraccion de imagenes ZSEXY usa `display_name` para filtrar/ordenar y `filename` hash para resolver la URL firmada por `/api/view`.
+- La UI `server-ui.html` ya hace polling cada 3 segundos y soporta status `retrying`.
+- `server.cjs` tiene `safeJsonStringify()` para evitar errores Anthropic 400 por surrogates invalidos.
+
+Importante:
+- En este momento se acabaron los creditos de ComfyUI Cloud, asi que no se puede completar una prueba real de generacion de imagenes hasta recargar creditos.
+- No confundas el bloqueo por creditos con bug de codigo.
+- Cuando haya creditos, prueba desde `http://127.0.0.1:3333` con el boton "Mas Sexy".
+- Si falla `Field 'prompt' cannot be empty`, revisar primero si el nodo Claude devolvio respuesta vacia o menos de 10 prompts no vacios separados por `*`.
+
+Objetivo siguiente:
+Probar la automatizacion end-to-end tras recargar creditos, verificar que se muestran las 10 imagenes en la UI, que el polling no queda infinito, y que los logs del monitor expliquen claramente el estado del workflow.
+```

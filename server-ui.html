@@ -2567,7 +2567,7 @@ function renderSexyImages(imgs) {
 }
 
 async function pollSexyContentRun(runId, deadline = Date.now() + 1_200_000) {
-  const POLL_INTERVAL_SEXY = 4000
+  const POLL_INTERVAL_SEXY = 3000
   let pollCount = 0
   while (Date.now() < deadline) {
     await sleep(POLL_INTERVAL_SEXY)
@@ -2579,6 +2579,18 @@ async function pollSexyContentRun(runId, deadline = Date.now() + 1_200_000) {
         renderSexyImages(data.sexyImages)
         return
       }
+
+      if (data.status === 'retrying' && data.runId) {
+        runId = data.runId
+        lastSexyContentRunId = data.runId
+        setSxStep('sxstep-analyze', 'active')
+        setSxStep('sxstep-generate', 'pending')
+        setSexyContentStatus(data.message || 'Reintentando generacion en ComfyUI Cloud...')
+        pollCount = 0
+        continue
+      }
+
+      if (data.message) setSexyContentStatus(data.message)
 
       if (data.status === 'error') {
         for (let i = 0; i < 10; i++) {
