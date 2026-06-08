@@ -2567,9 +2567,10 @@ function renderSexyImages(imgs) {
 }
 
 async function pollSexyContentRun(runId, deadline = Date.now() + 1_200_000) {
+  const POLL_INTERVAL_SEXY = 4000
   let pollCount = 0
   while (Date.now() < deadline) {
-    await sleep(POLL_INTERVAL)
+    await sleep(POLL_INTERVAL_SEXY)
     try {
       const res  = await fetch(`/api/status/${runId}`)
       const data = await res.json()

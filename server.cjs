@@ -530,15 +530,32 @@ SLOTS Y SUS ASPECT RATIOS (fijos en el workflow — no puedes cambiarlos):
 
 Distribuye los 8 posts en la semana de lunes a viernes según la narrativa del hilo. Tú decides cuántos por día.
 
-REGLAS FOTOGRÁFICAS UGC (aplica en TODOS los prompts):
-- "Shot on iPhone 15 Pro" — NUNCA studio lights
-- Incluir imperfecciones reales: grain de sensor, ligero motion blur ocasional
-- Tipos: selfie | mirror selfie | POV candid | lifestyle moment
-- Imágenes muy atractivas, magnéticas, cautivadoras y aspiracionales — siempre bella, alluring y captivating
-- Outfits reales según el nicho: streetwear, athleisure, vestidos, coordinated sets, loungewear
-- GEMINI SAFETY — OBLIGATORIO: NUNCA usar nude, naked, revealing, topless, sensual, erotic, explicit — Gemini bloqueará el request. Usar en cambio: alluring, captivating, magnetic, smoldering, confident, fierce, striking, body-hugging outfit, curve-accentuating
-- COHERENCIA NARRATIVA a lo largo de la semana
-- Prompts en INGLÉS, resto en ESPAÑOL
+PHOTOGRAPHY RULES — apply to every single prompt:
+Start every prompt with: "Shot on iPhone 15 Pro," — this is the only fixed element.
+
+LIGHTING — do not pick from a list. Read the scene you already described.
+The scene's location, time of day, and activity already imply a specific light source.
+Name that exact physical light as it exists in that space.
+A sauna: steam-diffused reddish heat glow. A 6am gym: cold overhead fluorescents.
+A yacht deck: harsh glare reflecting off the water surface. A bedroom at night: single warm lamp.
+Describe the actual light, not a generic photography label like "golden hour" or "natural light".
+Never reuse the same lighting description across the 8 prompts of a week.
+
+TECHNICAL IMPERFECTION — choose one artifact that is physically caused by the shooting conditions.
+A dark selfie → sensor noise. A fast-moving subject → motion blur. A bright outdoor scene
+→ blown highlights on skin. A mirror → slight lens distortion. A steamy space → condensation
+softening the lens. The imperfection must be a logical consequence of the scene — not a rotation.
+Never reuse the same imperfection type across the 8 weekly prompts.
+
+CAMERA: "f/1.8 equivalent, subject sharp, background naturally bokeh-blurred" when applicable.
+SKIN: "natural skin texture, pores slightly visible, real complexion" in every close-up.
+COMPOSITION: slightly imperfect, off-center, or organic crop — never symmetrically perfect framing.
+
+GEMINI SAFETY — OBLIGATORIO: NUNCA nude, naked, revealing, topless, sensual, erotic, explicit
+— usar: alluring, captivating, magnetic, smoldering, confident, fierce, striking,
+body-hugging outfit, curve-accentuating.
+
+Each prompt: 80–120 words, one dense paragraph, generation-ready, in English.
 
 FORMATO: ÚNICAMENTE JSON válido. Sin markdown.
 
@@ -1506,15 +1523,20 @@ const server = http.createServer(async (req, res) => {
         const statusRes = await fetch(`https://cloud.comfy.org/api/job/${ccId}/status`, {
           headers: { 'X-API-Key': COMFYCLOUD_API_KEY }
         })
-        if (!statusRes.ok) return json(res, 200, { status: 'running' })
+        if (!statusRes.ok) {
+          if (statusRes.status >= 500) return json(res, 200, { status: 'running' })
+          return json(res, 200, { status: 'error', message: `ComfyCloud API error ${statusRes.status}` })
+        }
         const statusData = await statusRes.json()
         const st = statusData.status || ''
         console.log(`[CC-SEXY-STATUS] ${ccId} -> ${st}`)
+        console.log('[CC-SEXY-STATUS-RAW]', JSON.stringify(statusData))
 
         if (st === 'completed') {
           const jobRes  = await fetch(`https://cloud.comfy.org/api/jobs/${ccId}`, {
             headers: { 'X-API-Key': COMFYCLOUD_API_KEY }
           })
+          if (!jobRes.ok) return json(res, 200, { status: 'running' })
           const jobData = await jobRes.json()
           console.log('[CC-SEXY OUTPUTS RAW]', JSON.stringify(jobData, null, 2))
           const outputs = jobData.outputs || {}
@@ -1543,16 +1565,18 @@ const server = http.createServer(async (req, res) => {
             return aNum - bNum
           })
 
-          const sexyImages = await Promise.all(sexyFiles.map(async img => {
+          const sexyImages = (await Promise.all(sexyFiles.map(async img => {
             if (img._url) return img._url
             const viewRes = await fetch(
               `https://cloud.comfy.org/api/view?filename=${encodeURIComponent(img.filename)}&subfolder=${encodeURIComponent(img.subfolder || '')}&type=output`,
-              { headers: { 'X-API-Key': COMFYCLOUD_API_KEY }, redirect: 'manual' }
+              { headers: { 'X-API-Key': COMFYCLOUD_API_KEY }, redirect: 'follow' }
             )
-            return viewRes.headers.get('location') || `https://cloud.comfy.org/api/view?filename=${encodeURIComponent(img.filename)}&type=output`
-          }))
+            if (viewRes.ok && viewRes.url) return viewRes.url
+            return viewRes.headers.get('location') || null
+          }))).filter(Boolean)
 
-          console.log(`  [CC-SEXY] sexyImages: ${sexyImages.length}`)
+          console.log(`  [CC-SEXY] sexyImages resueltas: ${sexyImages.length}`)
+          if (sexyImages.length === 0) return json(res, 200, { status: 'running' })
           return json(res, 200, { status: 'success', sexyImages })
         }
         if (['error', 'cancelled'].includes(st)) {
