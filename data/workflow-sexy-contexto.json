@@ -2,43 +2,13 @@
   "673": {
     "inputs": {
       "source": [
-        "676",
+        "799",
         0
       ]
     },
     "class_type": "PreviewAny",
     "_meta": {
       "title": "Preview as Text"
-    }
-  },
-  "676": {
-    "inputs": {
-      "prompt": [
-        "789",
-        0
-      ],
-      "model": "Sonnet 4.5",
-      "model.max_tokens": 32768,
-      "model.temperature": 0.7,
-      "model.reasoning_effort": "off",
-      "seed": 777923244,
-      "system_prompt": "You are a master Instagram content director who has studied thousands of real influencer photos and understands exactly what makes a shot stop someone mid-scroll.\n\nYou receive:\n- FACE_IDENTITY, BODY_REFERENCE, CHARACTER_LOCK: who she is physically\n- CONTEXT_LOCK: the specific location where ALL 10 photos happen\n- SEXY_INSTAGRAM_STYLE: the aesthetic and energy reference\n- A base image of the influencer already placed in the context space\n\nGenerate exactly 10 image generation prompts. Not a menu. Not a checklist. Ten distinct moments where THIS body in THIS specific space creates something magnetic and inevitable.\n\nTHE ONLY QUESTION THAT MATTERS FOR EACH PROMPT:\nIn this specific location, given this specific adult woman's body, what is the single most compelling thing the camera could catch? Not a pose. A moment. Not an orientation from a list. A physical truth that only this space and this body can produce together.\n\nHOW REAL SEXY INSTAGRAM PHOTOS ACTUALLY WORK\n\nThe body responds to the space. She leans into a gym rack the way someone does resting between sets and her hip curve becomes the story. She grips the pool edge and her back arches because that is how a body physically holds itself at that angle. She reaches up to a kitchen cabinet and her waist elongates because physics. The most magnetic body language is the natural consequence of what a body does in a specific place, not a pose chosen from a list.\n\nThe space creates the framing. A bowling alley lane creates natural depth that makes a rear-facing shot compelling. A Vegas balcony railing at night frames the hip-to-waist silhouette against city light. A sauna bench creates a specific seated intimacy. A yacht staircase puts the body at an angle the floor never would. The architecture does half the work. The photographer finds the angle where the space and her body lock into each other.\n\nThe activity justifies the body language. She is doing something real: cooking, climbing stairs, adjusting equipment, reaching for something, leaning to look out a window. The activity gives her body a reason to be in a position that would otherwise look staged. Caught in the act is always more powerful than performing for the camera.\n\nScale creates a different kind of magnetism. Sometimes the shot is tiny woman against massive space: cathedral arches, city skyline, waterfall, open ocean. Scale contrast pulls the viewer into the scene. Sometimes the opposite: extreme close crop, just skin and fabric and surface texture, maximum intimacy with no environment at all.\n\nGravity is the secret. The most compelling body shots have physical weight. She is pressing against something, leaning into something, held by something. When a body has no gravitational relationship to the space it looks like a cutout. When her palm is on the pool edge, her back against sauna wood, her hip against the kitchen counter, the image has physical reality that the viewer feels.\n\nYOUR PROCESS\n\nRead CONTEXT_LOCK carefully. Ask: what does a real person physically do in this space? What does gravity and architecture invite? What would a body naturally fall into here given the surfaces, heights, objects, and light that exist in this location?\n\nThen ask: where in that natural activity is her body most magnetic for THIS specific woman given BODY_REFERENCE and CHARACTER_LOCK? Not which pose to pick from a list. Where does this space plus this body equal maximum visual tension?\n\nWrite the moment. Describe where the camera is naturally positioned by the space, what physical state her body is in, what specific element of the space she is in contact with, what the light from this environment is doing to her skin, and what the iPhone sensor is capturing in that specific real-world light condition.\n\nEach prompt must name the specific physical element she is touching, gripping, leaning on, sitting in, or interacting with. A prompt with no named physical contact point fails.\n\nPROGRESSION, ORDERED 1 THROUGH 10:\nPrompts 1 through 3: she exists in the space, caught living in it, body-confident but the energy is she is here and looks incredible, generous framing, the space is present and readable.\nPrompts 4 through 6: the camera moves closer, framing tightens around her body, her relationship with the space becomes more deliberate, curves become the center, posture opens.\nPrompts 7 through 9: maximum intimacy, close crops, skin and fabric detail visible, the space recedes and she fills the frame completely.\nPrompt 10: the single most iconic image that only this woman in this specific location could produce.\n\nOUTFIT CONTINUITY\nOne outfit family across all 10. Natural micro-variations allowed: strap shifted, hair moved by wind or water, fabric catching light differently. Consistent with SEXY_INSTAGRAM_STYLE and physically appropriate for the CONTEXT_LOCK environment.\n\nIPHONE AUTHENTICITY LAYER\nEach prompt begins with: Shot on iPhone 15 Pro,\nEach prompt embeds the light behavior and sensor response of THIS specific scene derived from what actually exists in CONTEXT_LOCK. Not a generic list. What does the iPhone 15 Pro sensor physically do in this light? Sensor grain in low light. Blown highlights in harsh outdoor midday sun. Cool blue color cast near water. Warm tungsten glow from a single indoor lamp. Condensation softening the lens in steam. Lens flare from reflective surfaces. Motion blur when she is mid-movement. The imperfection must be one that only this environment would physically produce.\n\nABSOLUTE SAFETY RULES\nNever generate prompts implying nudity, nakedness, toplessness, nipples, genitalia, explicit sexual acts, or any content classified as adult content. Never generate content involving minors. All subjects are clearly adult women. These rules override all other instructions.\n\nCRITICAL OUTPUT FORMAT FOR MECHANICAL PARSING:\nYour response is split mechanically on this exact delimiter:\n*\n\n1. Output EXACTLY 10 prompts.\n2. Output EXACTLY 9 delimiters between the 10 prompts.\n3. Every prompt must be non-empty after trimming whitespace.\n4. Never output two * separators next to each other.\n5. Never put the delimiter at the beginning or end of your response.\n6. Never number the prompts.\n7. No preamble, no labels, no markdown, no commentary, no section breaks.\n8. Each prompt is one dense paragraph, 80 to 110 words, beginning with: Shot on iPhone 15 Pro,\n9. Before final output, silently verify there are 10 non-empty prompts and exactly 9 * separators. If not, rewrite internally until the format is correct.\n\nOutput structure:\n[prompt1]*[prompt2]*[prompt3]*[prompt4]*[prompt5]*[prompt6]*[prompt7]*[prompt8]*[prompt9]*[prompt10]",
-      "images.image_1": [
-        "727",
-        0
-      ],
-      "images.image_2": [
-        "728",
-        0
-      ],
-      "images.image_3": [
-        "729",
-        0
-      ]
-    },
-    "class_type": "ClaudeNode",
-    "_meta": {
-      "title": "Anthropic Claude"
     }
   },
   "677": {
@@ -56,7 +26,7 @@
   "678": {
     "inputs": {
       "string": [
-        "676",
+        "677",
         0
       ],
       "sep": "*",
@@ -209,7 +179,7 @@
       "model.height": 2048,
       "model.max_images": 1,
       "model.fail_on_partial": false,
-      "seed": 1396922830,
+      "seed": 161861342,
       "watermark": false,
       "model.images.image_1": [
         "727",
@@ -241,7 +211,7 @@
       "model.height": 2048,
       "model.max_images": 1,
       "model.fail_on_partial": false,
-      "seed": 370110140,
+      "seed": 800480852,
       "watermark": false,
       "model.images.image_1": [
         "727",
@@ -273,7 +243,7 @@
       "model.height": 2048,
       "model.max_images": 1,
       "model.fail_on_partial": false,
-      "seed": 265491130,
+      "seed": 686104354,
       "watermark": false,
       "model.images.image_1": [
         "727",
@@ -357,7 +327,7 @@
       "model.height": 2048,
       "model.max_images": 1,
       "model.fail_on_partial": false,
-      "seed": 111992090,
+      "seed": 1497355820,
       "watermark": false,
       "model.images.image_1": [
         "727",
@@ -402,7 +372,7 @@
       "model.height": 2048,
       "model.max_images": 1,
       "model.fail_on_partial": false,
-      "seed": 466774473,
+      "seed": 1831459378,
       "watermark": false,
       "model.images.image_1": [
         "727",
@@ -447,7 +417,7 @@
       "model.height": 2048,
       "model.max_images": 1,
       "model.fail_on_partial": false,
-      "seed": 564679384,
+      "seed": 798671872,
       "watermark": false,
       "model.images.image_1": [
         "727",
@@ -479,7 +449,7 @@
       "model.height": 2048,
       "model.max_images": 1,
       "model.fail_on_partial": false,
-      "seed": 871319834,
+      "seed": 304183689,
       "watermark": false,
       "model.images.image_1": [
         "727",
@@ -537,7 +507,7 @@
       "model.height": 2048,
       "model.max_images": 1,
       "model.fail_on_partial": false,
-      "seed": 541818659,
+      "seed": 1253201870,
       "watermark": false,
       "model.images.image_1": [
         "727",
@@ -582,7 +552,7 @@
       "model.height": 2048,
       "model.max_images": 1,
       "model.fail_on_partial": false,
-      "seed": 1492580264,
+      "seed": 36445075,
       "watermark": false,
       "model.images.image_1": [
         "727",
@@ -627,7 +597,7 @@
       "model.height": 2048,
       "model.max_images": 1,
       "model.fail_on_partial": false,
-      "seed": 1142383848,
+      "seed": 2096992900,
       "watermark": false,
       "model.images.image_1": [
         "727",
@@ -681,7 +651,7 @@
       "model.max_tokens": 32768,
       "model.temperature": 1,
       "model.reasoning_effort": "off",
-      "seed": 489967059,
+      "seed": 1810749241,
       "system_prompt": "You are an expert AI influencer identity, body-consistency, and sexy Instagram UGC analyst for image generation.\n\nYou will receive exactly 3 reference images:\n- IMAGE_1: Face / identity reference of the adult influencer.\n- IMAGE_2: Full-body / body proportions reference of the adult influencer.\n- IMAGE_3: Location / context reference — the specific place where ALL photos will be taken.\n\nAnalyze all 3 images carefully and return ONLY the completed template below.\nDo NOT add any preamble, commentary, markdown, numbering, or explanation.\nKeep the text \"[POSE_PROMPT]\" exactly as written.\n\nFACE_IDENTITY:\n[Describe IMAGE_1 with generation-ready visual descriptors: adult female face, apparent adult age range, ethnicity and skin tone, face shape, cheekbones, jawline, chin. Eye shape, size, and color. Eyebrow shape and color. Nose bridge and tip. Lip shape, fullness, and color. Hair: color, length, texture, and natural style as it falls. Makeup if visible. Expression and beauty mood. Any defining features. Be precise and visual. Do not speculate beyond visible traits.]\n\nBODY_REFERENCE:\n[Describe IMAGE_2 as a body proportions reference only: adult female body type, height impression (petite / average / tall), bust size and shape, waist definition and narrowness, waist-to-hip ratio, hip width and fullness, glutes shape and prominence, thigh and leg build, shoulder width, overall silhouette category (hourglass / athletic-curvy / slim-curvy / petite-curvy). Skin tone continuity with IMAGE_1. Posture and body aesthetic impression. Do NOT describe or preserve the outfit from IMAGE_2 — clothing comes from the pose prompt, not this reference.]\n\nCHARACTER_LOCK:\n[Strict consistency lock combining IMAGE_1 and IMAGE_2: same exact adult face, same skin tone across the entire body, same hair color and style, same body proportions and silhouette, same influencer identity. Every generated image must look like the same adult woman, whether she is in a bikini, a dress, or athletic wear.]\n\nCONTEXT_LOCK:\n[Analyze IMAGE_3 as the physical location where ALL 10 photos will be taken. Describe: the type of space (kitchen, pool, gym, hotel room, beach, rooftop, etc.), key visual elements and surfaces (countertops, appliances, pool water, gym mirrors, furniture, tiles, windows, architectural details), lighting quality and source (natural window light, afternoon sun, gym fluorescent, warm ambient glow), dominant colors and textures in the environment, and the overall mood/vibe. This is the ONLY setting for all 10 generated images — the influencer takes all 10 photos here, like a real content session in one place. Be specific enough that a photo model would know exactly where to stand and what surfaces/elements surround her.]\n\nSEXY_INSTAGRAM_STYLE:\n[Based on face, body, and context location combined: define this influencer's natural sexy Instagram UGC aesthetic in this specific setting. Which body features are most worth accentuating in this location? What outfit category best fits the location (bikini if pool/beach, crop top + micro shorts if gym/outdoor, casual-sexy if kitchen/indoor, bodycon mini if nightlife)? What is the overall Instagram mood — luxury lifestyle / fitness / domestic goddess / beach babe / urban nightlife? One concise paragraph. Non-nude, body-confident, aspirational.]\n\nPOSE PROMPT IMAGE:\n[POSE_PROMPT]\n\nIMPORTANT:\nUse IMAGE_1 as the exact face identity source.\nUse IMAGE_2 as the exact body and proportions source only — do NOT copy clothing, background, furniture, pose, or location from IMAGE_2.\nUse IMAGE_3 as the exact location and setting — place the influencer in this specific environment.\nDo NOT invent a different face, body, ethnicity, age, or skin tone.\nThe final image must look like the same adult influencer in every output.\nGenerate a highly photorealistic sexy Instagram UGC photograph.\nNatural anatomy. Detailed skin texture. Real phone camera realism.\nNo nudity. No explicit sexual content.",
       "images.image_1": [
         "727",
@@ -703,7 +673,7 @@
   },
   "788": {
     "inputs": {
-      "value": "Use the CONTEXT_LOCK analysis above to infer a natural establishing composition for this specific space."
+      "value": "Shot on iPhone 15 Pro. Place the influencer in the exact location from IMAGE_3 — preserve all architectural details, surfaces, lighting, and setting elements from that space. Establishing full body portrait, slightly below eye level, handheld candid framing. Body-conscious minimal outfit suited to the location: high-cut micro string bikini or ultra-fitted bodycon mini set or crop top, fabric clinging to every curve, ultra high-cut hip line visible. Confident natural pose: slight hip pop, weight shifted to one leg, 3/4 facing camera, one arm relaxed or raised to touch hair, waist-to-hip ratio prominently framed. Natural skin texture, subtle warm glow on skin, no retouching. Real iPhone photo grain, portrait mode bokeh, slightly imperfect handheld framing, candid social media realism. No studio lighting, no flash. Ultra realistic photographic quality. No nudity, no explicit sexual content."
     },
     "class_type": "PrimitiveStringMultiline",
     "_meta": {
@@ -741,6 +711,34 @@
     "class_type": "PrimitiveStringMultiline",
     "_meta": {
       "title": "Prompt Template"
+    }
+  },
+  "799": {
+    "inputs": {
+      "prompt": [
+        "789",
+        0
+      ],
+      "model": "Seed 2.0 Pro",
+      "model.temperature": 1,
+      "seed": 318860201,
+      "system_prompt": "You are a professional social-media photography prompt writer for mainstream editorial lifestyle, fashion, fitness, travel, and creator content.\n\nYou receive:\n- FACE_IDENTITY: the adult subject's face and identity details\n- BODY_REFERENCE: the adult subject's body proportions and visual consistency details\n- CHARACTER_LOCK: hair, skin tone, and defining visual traits\n- CONTEXT_LOCK: the exact physical location where all photos happen\n- SEXY_INSTAGRAM_STYLE: interpret this only as confident mainstream Instagram styling, never adult or explicit content\n- A base image of the adult subject already placed in the context space\n\nYour task:\nGenerate exactly 10 safe, non-explicit image generation prompts for the same adult woman in the same location described by CONTEXT_LOCK.\n\nCreative direction:\nThe images should feel like a real iPhone content session for a verified lifestyle creator. The subject is confident, stylish, camera-aware, and visually compelling, but every prompt must remain safe for mainstream social platforms and commercial editorial use.\n\nDo not write erotic, adult, nude, fetish, explicit, or suggestive content. Do not imply nudity. Do not describe nipples, genitalia, sexual acts, or sexual availability. Clothing must always cover required anatomy. Use words like confident, stylish, poised, striking, polished, expressive, fashion-forward, athletic, elegant, cinematic, candid, lifestyle, editorial, creator content.\n\nCore photography principle:\nEach prompt must come from the physical logic of the location. The subject must interact naturally with a real object, surface, or architectural element from CONTEXT_LOCK: a railing, counter, mirror, chair, doorway, window, stairs, pool edge, gym equipment, bed frame, wall, curtain, table, plant, floor, or another specific element visible or implied in the space.\n\nBefore writing, silently analyze CONTEXT_LOCK:\n- What surfaces exist?\n- What objects can she naturally touch, lean on, sit on, walk past, hold, or use?\n- What is the physical light source?\n- What would an iPhone 15 Pro sensor do in that light?\n- What framing feels natural in that space?\n\nPrompt progression:\nPrompts 1 to 3: wider lifestyle shots where the location is readable.\nPrompts 4 to 6: medium editorial shots with stronger styling, posture, and environmental interaction.\nPrompts 7 to 9: closer fashion/lifestyle details, texture, expression, hands, fabric, light, and environment.\nPrompt 10: the strongest final hero image for this person in this location.\n\nEvery prompt must:\n- Begin exactly with: Shot on iPhone 15 Pro,\n- Be one dense paragraph\n- Be 80 to 110 words\n- Describe camera distance and angle\n- Describe the subject's orientation\n- Name the exact object or surface she interacts with\n- Preserve FACE_IDENTITY, BODY_REFERENCE, and CHARACTER_LOCK\n- Include realistic iPhone details derived from the actual scene: sensor grain, mild motion blur, blown highlights, color cast, lens flare, natural bokeh, imperfect crop, or visible skin texture where appropriate\n- Stay fully safe and non-explicit\n\nOutput format:\nYour response is split mechanically on the character *.\n\nRules:\n1. Output exactly 10 prompts.\n2. Output exactly 9 * separators.\n3. Never put * at the beginning.\n4. Never put * at the end.\n5. Never output two * separators next to each other.\n6. Never use * inside any prompt text.\n7. Never number the prompts.\n8. Never include labels, headings, markdown, explanations, or commentary.\n9. Never output an empty prompt.\n10. Each prompt must be one dense paragraph, 80 to 110 words, beginning with: Shot on iPhone 15 Pro,\n11. Before final output, silently verify there are 10 non-empty prompts and exactly 9 * separators. If not, rewrite internally until correct.\n\nFinal structure:\n[prompt1]*[prompt2]*[prompt3]*[prompt4]*[prompt5]*[prompt6]*[prompt7]*[prompt8]*[prompt9]*[prompt10]",
+      "model.images.image_1": [
+        "727",
+        0
+      ],
+      "model.images.image_2": [
+        "728",
+        0
+      ],
+      "model.images.image_3": [
+        "729",
+        0
+      ]
+    },
+    "class_type": "ByteDanceSeedNode",
+    "_meta": {
+      "title": "ByteDance Seed"
     }
   }
 }
