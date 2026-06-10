@@ -1,0 +1,11 @@
+{
+  "name": "zami-ai-studio",
+  "version": "13.0.0",
+  "private": true,
+  "type": "commonjs",
+  "scripts": {
+    "check": "node --check server.cjs",
+    "start": "node server.cjs",
+    "test": "node --test"
+  }
+}

@@ -4,7 +4,6 @@ const http   = require('http')
 const https  = require('https')
 const fs     = require('fs')
 const path   = require('path')
-const url    = require('url')
 const crypto = require('crypto')
 
 // ── load .env manually (no external deps) ───────────────────────────────────
@@ -43,10 +42,12 @@ const WORKFLOW_SEXY_CONTEXTO = (() => {
 const SUPABASE_URL          = process.env.VITE_SUPABASE_URL || ''
 const SUPABASE_KEY          = process.env.VITE_SUPABASE_ANON_KEY || ''
 const SUPABASE_BUCKET       = process.env.SUPABASE_BUCKET || 'zami-images'
-const PORT                  = 3333
-const HOST                  = '127.0.0.1'
+const PORT                  = Number(process.env.PORT || 3333)
+const HOST                  = process.env.HOST || (process.env.RAILWAY_ENVIRONMENT ? '0.0.0.0' : '127.0.0.1')
+const STARTED_AT            = new Date()
 const CD_BASE               = 'api.comfydeploy.com'
-const DATA_DIR              = path.join(__dirname, 'data')
+const DEFAULT_DATA_DIR      = path.join(__dirname, 'data')
+const DATA_DIR              = resolveDataDir(process.env.PERSISTENCE_DIR || process.env.RAILWAY_VOLUME_MOUNT_PATH || DEFAULT_DATA_DIR)
 const INFLUENCERS_FILE      = path.join(DATA_DIR, 'influencers.json')
 const MAX_JSON_BODY_BYTES   = 25 * 1024 * 1024
 const MAX_UPLOAD_BYTES      = 8 * 1024 * 1024
@@ -57,6 +58,12 @@ const CC_SEXY_POLL_MS = 3000
 const CC_SEXY_OUTPUT_WAIT_LIMIT = 10
 const CC_SEXY_EMPTY_PROMPT_MAX_RETRIES = 2
 const comfyCloudSexyRuns = new Map()
+
+function resolveDataDir(dir) {
+  const selected = String(dir || '').trim()
+  if (!selected) return DEFAULT_DATA_DIR
+  return path.isAbsolute(selected) ? selected : path.resolve(__dirname, selected)
+}
 
 function isEmptyPromptError(message) {
   if (!message) return false
@@ -1305,10 +1312,49 @@ function allowedCorsOrigin(origin) {
 const cachedHtml = fs.readFileSync(path.join(__dirname, 'server-ui.html'))
 const cachedHero = (() => { try { return fs.readFileSync(path.join(__dirname, 'Foto inicio', 'Nano Banana Pro_00001_.png')) } catch { return null } })()
 
+function buildHealthPayload() {
+  let influencers = 0
+  try {
+    const db = loadInfluencers()
+    influencers = Array.isArray(db.influencers) ? db.influencers.length : 0
+  } catch {}
+
+  return {
+    ok: true,
+    service: 'zami-ai-studio',
+    version: 'v13',
+    host: HOST,
+    port: PORT,
+    uptime_seconds: Math.floor(process.uptime()),
+    started_at: STARTED_AT.toISOString(),
+    influencers,
+    storage: {
+      data_dir: fs.existsSync(DATA_DIR),
+      influencers_file: fs.existsSync(INFLUENCERS_FILE),
+      hero_photo: Boolean(cachedHero),
+      workflow_sexy_contexto: Boolean(WORKFLOW_SEXY_CONTEXTO),
+      persistence_dir: DATA_DIR,
+      persistence_mode: DATA_DIR === DEFAULT_DATA_DIR ? 'local-file' : 'external-file',
+    },
+    apis: {
+      comfydeploy: Boolean(API_KEY),
+      anthropic: Boolean(ANTHROPIC_KEY),
+      supabase_url: Boolean(SUPABASE_URL),
+      supabase_key: Boolean(SUPABASE_KEY),
+      comfy_cloud: Boolean(COMFYCLOUD_API_KEY),
+    },
+    deployments: {
+      aion: DEPLOYMENT_ID_AION,
+      body: DEPLOYMENT_ID_BODY,
+      content: DEPLOYMENT_ID_CONTENT,
+    },
+  }
+}
+
 const server = http.createServer(async (req, res) => {
-  const parsed   = url.parse(req.url, true)
-  const pathname = parsed.pathname
-  const origin   = req.headers.origin
+  const requestUrl = new URL(req.url, `http://${req.headers.host || `${HOST}:${PORT}`}`)
+  const pathname   = requestUrl.pathname
+  const origin     = req.headers.origin
 
   if (req.method === 'OPTIONS') {
     if (!isAllowedOrigin(origin)) {
@@ -1339,6 +1385,12 @@ const server = http.createServer(async (req, res) => {
     if (!cachedHero) { res.writeHead(404); res.end('Not found'); return }
     res.writeHead(200, { 'Content-Type': 'image/png', 'Cache-Control': 'public, max-age=86400' })
     res.end(cachedHero)
+    return
+  }
+
+  // GET /api/health -- safe smoke endpoint for local checks and Railway monitors.
+  if (req.method === 'GET' && pathname === '/api/health') {
+    json(res, 200, buildHealthPayload())
     return
   }
 
@@ -1902,23 +1954,48 @@ server.on('error', err => {
   process.exit(1)
 })
 
-server.listen(PORT, HOST, () => {
-  try {
-    if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true })
-    if (!fs.existsSync(INFLUENCERS_FILE)) fs.writeFileSync(INFLUENCERS_FILE, JSON.stringify({ influencers: [] }))
-    const db = loadInfluencers()
-    console.log(`\nZami AI Studio v3 AION`)
-    console.log(`   http://${HOST}:${PORT}`)
-    console.log(`   ComfyDeploy: ${API_KEY ? API_KEY.slice(0, 8) + '...' : 'NO CONFIGURADA'}`)
-    console.log(`   Anthropic:   ${ANTHROPIC_KEY ? ANTHROPIC_KEY.slice(0, 8) + '...' : 'NO CONFIGURADA'}`)
-    console.log(`   Modelo:      ${ANTHROPIC_MODEL}`)
-    console.log(`   AION deploy: ${DEPLOYMENT_ID_AION}`)
-    console.log(`   Content deploy: ${DEPLOYMENT_ID_CONTENT}`)
-    console.log(`   Supabase:    ${SUPABASE_URL || 'NO CONFIGURADA'} / bucket: ${SUPABASE_BUCKET}`)
-    console.log(`   Influencers: ${db.influencers.length} guardadas`)
-    console.log()
-  } catch (err) {
-    console.error('Error al iniciar:', err.message)
-    process.exit(1)
-  }
-})
+function startServer() {
+  server.listen(PORT, HOST, () => {
+    try {
+      if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true })
+      if (!fs.existsSync(INFLUENCERS_FILE)) fs.writeFileSync(INFLUENCERS_FILE, JSON.stringify({ influencers: [] }))
+      const db = loadInfluencers()
+      const address = server.address()
+      const visibleHost = address?.address || HOST
+      const visiblePort = address?.port || PORT
+      console.log(`\nZami AI Studio v3 AION`)
+      console.log(`   http://${visibleHost}:${visiblePort}`)
+      console.log(`   ComfyDeploy: ${API_KEY ? 'CONFIGURADA' : 'NO CONFIGURADA'}`)
+      console.log(`   Anthropic:   ${ANTHROPIC_KEY ? 'CONFIGURADA' : 'NO CONFIGURADA'}`)
+      console.log(`   ComfyCloud:  ${COMFYCLOUD_API_KEY ? 'CONFIGURADA' : 'NO CONFIGURADA'}`)
+      console.log(`   Modelo:      ${ANTHROPIC_MODEL}`)
+      console.log(`   AION deploy: ${DEPLOYMENT_ID_AION}`)
+      console.log(`   Content deploy: ${DEPLOYMENT_ID_CONTENT}`)
+      console.log(`   Supabase:    ${SUPABASE_URL || 'NO CONFIGURADA'} / bucket: ${SUPABASE_BUCKET}`)
+      console.log(`   Persistencia: ${DATA_DIR}`)
+      console.log(`   Influencers: ${db.influencers.length} guardadas`)
+      console.log()
+    } catch (err) {
+      console.error('Error al iniciar:', err.message)
+      process.exit(1)
+    }
+  })
+}
+
+if (require.main === module) startServer()
+
+module.exports = {
+  BODY_PARAM_OPTIONS,
+  buildHealthPayload,
+  decodeBase64Image,
+  extractImages,
+  inferBodyParamOverridesFromText,
+  looksLikeImage,
+  normalizeAionPayload,
+  publicCcSexyStatus,
+  resolveDataDir,
+  safeJsonStringify,
+  sanitizeLoneSurrogates,
+  server,
+  startServer,
+}
