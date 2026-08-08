@@ -6,3 +6,10 @@ dist/
 AGENTS.md
 data/influencers.json
 .railway-data/
+
+# Logs locales del servidor
+server-out.txt
+server-err.txt
+
+# Copia duplicada del proyecto creada por error (tiene su propio .git)
+UsersLENOVOzami-ai-studio-dev-infraestructura/
