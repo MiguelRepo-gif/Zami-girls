@@ -1185,6 +1185,8 @@ let currentContentPlan1   = null
 let currentContentPlan2   = null
 let lastContentRunId1     = null
 let lastContentRunId2     = null
+let currentWeekImages1    = []   // URLs mostradas en los slots de la semana 1
+let currentWeekImages2    = []   // URLs mostradas en los slots de la semana 2
 const _weekTimers         = {}
 
 // Toggle state
@@ -1702,9 +1704,64 @@ function selectInfluencer(btn) {
   syncPhase4Thumbs()
   document.getElementById('p4-influencer-label').textContent = `${inf.nombre} · ${inf.nicho} · ${inf.weeks?.length || 0} semanas generadas`
   document.getElementById('btn-generate-plan').disabled = false
-  setContentPlanStatus('Influencer cargada. Clic en "✦ Generar 2 Semanas de Contenido" para comenzar.')
+
+  const shown = renderSavedWeeks(inf)
+  setContentPlanStatus(shown
+    ? `Influencer cargada · ${shown} semana(s) guardada(s) en pantalla. Clic en "✦ Generar 2 Semanas de Contenido" para crear nuevas.`
+    : 'Influencer cargada. Clic en "✦ Generar 2 Semanas de Contenido" para comenzar.')
+
   renderInfluencersPanel(getCachedInfluencers())
   document.getElementById('content-plan-status').scrollIntoView({ behavior: 'smooth', block: 'start' })
+}
+
+// ── Repinta las semanas ya guardadas de una influencer (histórico) ──────────
+// Solo lectura: los botones "Guardar Semana" quedan ocultos porque ya están
+// en el historial. Devuelve cuántas semanas se pintaron.
+function renderSavedWeeks(inf) {
+  ;[1, 2].forEach(wn => {
+    const sec = document.getElementById(`week-section-${wn}`)
+    if (sec) sec.style.display = 'none'
+    const saveBtn = document.getElementById(`btn-save-week-${wn}`)
+    if (saveBtn) saveBtn.style.display = 'none'
+    const saveSt = document.getElementById(`week-save-status-${wn}`)
+    if (saveSt) saveSt.textContent = ''
+    const elapsed = document.getElementById(`week-elapsed-${wn}`)
+    if (elapsed) elapsed.textContent = ''
+  })
+
+  const weeks  = Array.isArray(inf.weeks) ? inf.weeks : []
+  const recent = weeks.filter(w => w?.plan?.week?.length).slice(-2)
+  if (!recent.length) return 0
+
+  recent.forEach((week, idx) => {
+    const wn  = idx + 1
+    const sec = document.getElementById(`week-section-${wn}`)
+    if (sec) sec.style.display = 'block'
+
+    renderWeekCalendar(wn, week.plan)                         // pinta captions y prompts
+    ;['plan', 'send', 'gen', 'done'].forEach(s => setWcStep(wn, s, 'done'))
+    setWeekStatus(wn, 'done', week.theme || `Semana guardada ${idx + 1}`)
+
+    if (Array.isArray(week.images) && week.images.length) {
+      renderWeekImages(week.images, wn)
+    } else {
+      // Semanas guardadas antes de que existiera la persistencia de fotos.
+      for (let i = 1; i <= 8; i++) {
+        const slotEl = document.getElementById(`slot-w${wn}-${i}`)
+        if (slotEl) slotEl.innerHTML = '<div class="slot-placeholder" style="color:#555;font-size:0.66rem;text-align:center;padding:14px 6px">Sin foto guardada</div>'
+      }
+      if (wn === 1) currentWeekImages1 = []
+      else          currentWeekImages2 = []
+    }
+
+    const saveSt = document.getElementById(`week-save-status-${wn}`)
+    if (saveSt) {
+      const when = week.generated_at ? new Date(week.generated_at).toLocaleDateString() : ''
+      saveSt.textContent = `En historial${when ? ` · ${when}` : ''}`
+    }
+  })
+
+  return recent.length
 }
 
 function showNewInfluencerFlow() {
@@ -1714,6 +1771,8 @@ function showNewInfluencerFlow() {
   generatedPersonaText  = null
   currentContentPlan    = null
   lastSexyContentRunId   = null
+  currentWeekImages1    = []
+  currentWeekImages2    = []
 
   document.getElementById('create-section').style.display = 'block'
   document.getElementById('progress-section').style.display = 'none'
@@ -2151,6 +2210,9 @@ function makeWeekDayCard(slotData, weekNum) {
 // ── Render week images (called when ComfyDeploy run completes) ─────────────
 function renderWeekImages(imgs, weekNum) {
   const all = (imgs || []).slice(0, 8)
+  // Se recuerdan para poder persistirlas al pulsar "Guardar Semana".
+  if (weekNum === 1) currentWeekImages1 = all
+  else               currentWeekImages2 = all
   for (let i = 0; i < 8; i++) {
     const slotEl = document.getElementById(`slot-w${weekNum}-${i + 1}`)
     const imgUrl = all[i]
@@ -2647,23 +2709,34 @@ async function saveWeekData(weekNum) {
 
   const btn       = document.getElementById(`btn-save-week-${weekNum}`)
   const statusEl  = document.getElementById(`week-save-status-${weekNum}`)
+  const images    = weekNum === 1 ? currentWeekImages1 : currentWeekImages2
   btn.disabled    = true
-  btn.textContent = 'Guardando...'
+  btn.textContent = images.length ? 'Guardando imágenes...' : 'Guardando...'
+  if (statusEl) statusEl.textContent = images.length ? `Copiando ${images.length} fotos a almacenamiento permanente...` : ''
 
   try {
     const res = await fetch(`/api/influencers/${selectedInfluencer.id}/weeks`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ theme: plan.theme, summary: plan.summary || '', plan }),
+      body: JSON.stringify({ theme: plan.theme, summary: plan.summary || '', plan, images }),
     })
     const data = await res.json()
     if (!res.ok || data.error) throw new Error(data.error || `HTTP ${res.status}`)
 
-    selectedInfluencer.weeks = [...(selectedInfluencer.weeks || []), { week_id: data.week_id, theme: plan.theme, summary: plan.summary }]
+    selectedInfluencer.weeks = [...(selectedInfluencer.weeks || []), { week_id: data.week_id, theme: plan.theme, summary: plan.summary, plan, images }]
     await loadInfluencers()
     btn.textContent      = '✓ Guardada'
-    if (statusEl) statusEl.textContent = `"${plan.theme}" en historial`
-    showToast(`Semana ${weekNum} guardada`, 'success')
+    const persisted = typeof data.images_persisted === 'number' ? data.images_persisted : 0
+    if (statusEl) {
+      statusEl.textContent = data.images
+        ? `"${plan.theme}" · ${persisted}/${data.images} fotos guardadas`
+        : `"${plan.theme}" en historial`
+    }
+    if (data.images && persisted < data.images) {
+      showToast(`Semana ${weekNum} guardada · ${persisted}/${data.images} fotos persistidas`, 'warning')
+    } else {
+      showToast(`Semana ${weekNum} guardada`, 'success')
+    }
   } catch (err) {
     if (statusEl) statusEl.textContent = `Error: ${err.message}`
     btn.disabled    = false

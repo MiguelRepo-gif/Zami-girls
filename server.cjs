@@ -538,6 +538,49 @@ function uploadToSupabase(buffer, filename, contentType) {
   })
 }
 
+// ── Espejo de imágenes generadas → Supabase Storage ──────────────────────────
+// Las URLs de ComfyDeploy / ComfyUI Cloud son temporales (S3 firmado). Para que
+// una imagen siga viéndose meses después hay que copiarla al bucket propio.
+// Regla de oro: si el espejo falla, se conserva la URL original y el flujo sigue.
+const MIRROR_EXT_TYPES = { jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', webp: 'image/webp' }
+
+function isSupabasePublicUrl(url) {
+  if (!SUPABASE_URL || typeof url !== 'string') return false
+  return url.startsWith(`${SUPABASE_URL}/storage/v1/object/public/`)
+}
+
+async function mirrorImageToSupabase(imageUrl, prefix = 'gen') {
+  if (typeof imageUrl !== 'string' || !imageUrl.startsWith('http')) return imageUrl
+  if (isSupabasePublicUrl(imageUrl)) return imageUrl          // ya es permanente
+  if (!SUPABASE_URL || !SUPABASE_KEY) return imageUrl         // sin Supabase: no romper nada
+
+  try {
+    const imgRes = await fetch(imageUrl)
+    if (!imgRes.ok) throw new Error(`descarga ${imgRes.status}`)
+    const buffer = Buffer.from(await imgRes.arrayBuffer())
+    if (!buffer.length) throw new Error('descarga vacia')
+
+    const rawExt   = imageUrl.split('?')[0].split('.').pop().toLowerCase()
+    const ext      = MIRROR_EXT_TYPES[rawExt] ? rawExt : 'jpg'
+    const filename = `${prefix}/${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
+
+    const publicUrl = await uploadToSupabase(buffer, filename, MIRROR_EXT_TYPES[ext])
+    console.log(`  [MIRROR] ${prefix} ${(buffer.length / 1024).toFixed(0)}KB -> ${publicUrl}`)
+    return publicUrl
+  } catch (err) {
+    console.error(`[MIRROR WARN] ${prefix}: ${err.message} — se conserva la URL original`)
+    return imageUrl
+  }
+}
+
+// Secuencial a propósito: 8-10 imágenes seguidas, sin saturar Supabase.
+async function mirrorImageList(urls, prefix) {
+  if (!Array.isArray(urls)) return []
+  const out = []
+  for (const url of urls) out.push(await mirrorImageToSupabase(url, prefix))
+  return out
+}
+
 // ── Body generation (legacy — deployment cabf22a3) ───────────────────────────
 async function startBodyRun(prompt, inputImage) {
   const res = await cdRequest('POST', `/api/run/deployment/queue`, {
@@ -1668,13 +1711,18 @@ const server = http.createServer(async (req, res) => {
       if (!nicho)   { json(res, 400, { error: 'nicho requerido' }); return }
       if (!faceUrl) { json(res, 400, { error: 'face_url requerido' }); return }
 
+      // Rostro y cuerpo base a Supabase para que no dependan de la URL temporal
+      // de ComfyDeploy. Si el espejo falla se guarda la original (no bloquea).
+      const persistedFace = await mirrorImageToSupabase(faceUrl, 'influencers/face')
+      const persistedBody = bodyUrl ? await mirrorImageToSupabase(bodyUrl, 'influencers/body') : bodyUrl
+
       const influencer = await updateInfluencers(data => {
         const item = {
           id:         crypto.randomUUID(),
           nombre,
           nicho,
-          face_url:   faceUrl,
-          body_url:   bodyUrl,
+          face_url:   persistedFace,
+          body_url:   persistedBody,
           persona,
           created_at: new Date().toISOString(),
           weeks:      [],
@@ -1698,6 +1746,18 @@ const server = http.createServer(async (req, res) => {
       const influencerId = weekMatch[1]
       const body = await readBody(req)
       const { theme, summary, plan } = body
+      const rawImages = Array.isArray(body.images)
+        ? body.images.filter(u => typeof u === 'string' && u.startsWith('http'))
+        : []
+
+      // Pre-chequeo barato: no gastar subidas si la influencer no existe.
+      const exists = loadInfluencers().influencers.some(i => i.id === influencerId)
+      if (!exists) { json(res, 404, { error: 'influencer no encontrada' }); return }
+
+      // Copia permanente de las fotos de la semana antes de registrarlas.
+      if (rawImages.length) console.log(`\n[WEEK SAVE] espejando ${rawImages.length} imagenes a Supabase...`)
+      const images = await mirrorImageList(rawImages, `weeks/${influencerId}`)
+      const persistedCount = images.filter(isSupabasePublicUrl).length
 
       const result = await updateInfluencers(data => {
         const influencer = data.influencers.find(i => i.id === influencerId)
@@ -1712,12 +1772,18 @@ const server = http.createServer(async (req, res) => {
           theme:        theme   || '',
           summary:      summary || '',
           plan:         plan    || null,
+          images,
         }
         influencer.weeks.push(week)
         return { week, influencer }
       })
-      console.log(`\n[WEEK SAVED] influencer="${result.influencer.nombre}" theme="${theme}"`)
-      json(res, 200, { week_id: result.week.week_id, influencer_id: influencerId })
+      console.log(`[WEEK SAVED] influencer="${result.influencer.nombre}" theme="${theme}" imagenes=${persistedCount}/${images.length} persistidas`)
+      json(res, 200, {
+        week_id:         result.week.week_id,
+        influencer_id:   influencerId,
+        images:          images.length,
+        images_persisted: persistedCount,
+      })
     } catch (err) {
       console.error('[WEEK SAVE ERROR]', err.message)
       fail(res, err)
@@ -1990,7 +2056,10 @@ module.exports = {
   decodeBase64Image,
   extractImages,
   inferBodyParamOverridesFromText,
+  isSupabasePublicUrl,
   looksLikeImage,
+  mirrorImageList,
+  mirrorImageToSupabase,
   normalizeAionPayload,
   publicCcSexyStatus,
   resolveDataDir,
