@@ -561,8 +561,8 @@ RunId prefix: "ccsx:" + prompt_id
 | `POST` | `/api/generate-persona` | `{ nombre, nicho, face_url, body_url }` | Claude genera AI Persona |
 | `GET` | `/api/status/:runId` | — | Routing por prefijo → AION / ComfyDeploy Content / ComfyUI Cloud |
 | `GET` | `/api/influencers` | — | Lista influencers guardadas |
-| `POST` | `/api/influencers` | `{ nombre, nicho, face_url, body_url, persona }` | Guarda influencer |
-| `POST` | `/api/influencers/:id/weeks` | `{ theme, summary, plan }` | Guarda semana |
+| `POST` | `/api/influencers` | `{ nombre, nicho, face_url, body_url, persona }` | Guarda influencer — espeja face/body a Supabase |
+| `POST` | `/api/influencers/:id/weeks` | `{ theme, summary, plan, images? }` | Guarda semana — espeja las 8 fotos a Supabase → `{ week_id, images, images_persisted }` |
 | `POST` | `/api/generate-content-plan` | `{ persona, nombre, nicho, face_url, body_url, week_history }` | Plan semanal → 8 piezas |
 | `POST` | `/api/generate-content-day` | `{ face_url, body_url, prompts[8] }` | 1 run ComfyDeploy f9822b81 → 8 imágenes UGC → `{ runId: "cdc:uuid" }` |
 | `POST` | `/api/generate-sexy-from-content` | `{ face_url, body_url, contexto_url }` | ComfyUI Cloud → 10 fotos sexy → `{ runId: "ccsx:uuid" }` |
@@ -793,10 +793,56 @@ Botón "✦ Más Sexy":
 4. ✅ **2 Semanas de Contenido UGC** — 1 clic → plan semana 1 → run semana 1 → plan semana 2 → run semana 2 → 16 imágenes con skeleton shimmer, badges, timers, toasts
 5. ✅ **"✦ Más Sexy"** — cualquier foto de contenido → 3 uploads a ComfyUI Cloud → workflow patched → 10 imágenes ZSEXY1-ZSEXY10
 
+6. ✅ **Persistencia de imágenes en Supabase** — al guardar semana, las 8 fotos se copian al bucket `zami-images`; al seleccionar una influencer sus semanas se repintan con fotos, captions y prompts
+
 **Tag de referencia:** `v1.0-stable` — checkpoint seguro en `main`, usar como base para cualquier rollback.
+
+---
+
+## PRODUCCIÓN — RAILWAY (desde 2026-08-08)
+
+**URL pública:** https://zami-girls-production.up.railway.app
+**Repo que despliega Railway:** `MiguelRepo-gif/Zami-girls` (del cliente), rama **`codex/railway-preview`**.
+Un `push` a esa rama despliega a producción viva. El botón **Redeploy** de Railway repite el
+*mismo* commit — para publicar código nuevo hay que hacer push o usar `Ctrl+K → Deploy Latest Commit`.
+
+**Persistencia:** Volume de Railway montado en `/data` (`PERSISTENCE_DIR=/data`).
+Verificar en `/api/health` → `persistence_mode: "external-file"`. Si dice `local-file`, el volumen
+se desconectó y los influencers se perderían en el próximo deploy.
+
+**Supabase activo:** proyecto `qbffzmwedjekufsgutff`, bucket `zami-images`.
+⚠️ El proyecto anterior `vtyuylgfjvleywupbdzl` fue **borrado** — ya no resuelve DNS.
+
+**Trampas de configuración ya sufridas:**
+- `VITE_SUPABASE_URL` debe ser el dominio pelado, **sin** `/rest/v1/` — con el sufijo las URLs
+  públicas salen rotas (`.../rest/v1//storage/...`).
+- En Railway el campo *valor* lleva solo el valor, nunca `NOMBRE=valor`.
+- Verificación rápida sin gastar créditos: `POST /api/upload-image` con un PNG 1×1 en base64 y
+  comprobar que la URL devuelta cargue con 200.
+
+---
+
+## PERSISTENCIA DE IMÁGENES GENERADAS
+
+Las URLs de ComfyDeploy y ComfyUI Cloud son temporales (S3 firmado) y expiran. Por eso toda
+imagen que deba sobrevivir se copia al bucket propio antes de guardarse.
+
+- **`mirrorImageToSupabase(url, prefix)`** en `server.cjs` — descarga la imagen y la sube a
+  `zami-images`. **Si algo falla, devuelve la URL original y el flujo continúa.** Nunca bloquea
+  un guardado por un fallo de almacenamiento.
+- **`POST /api/influencers`** — espeja `face_url` y `body_url` (prefijos `influencers/face`, `influencers/body`).
+- **`POST /api/influencers/:id/weeks`** — recibe `images[]`, las espeja bajo `weeks/{influencerId}`
+  y las guarda dentro de la semana. Pre-chequeo 404 para no gastar subidas si la influencer no existe.
+- **UI** — `renderWeekImages()` recuerda las URLs en `currentWeekImages1/2`; `saveWeekData()` las
+  envía; `renderSavedWeeks()` repinta las semanas guardadas al seleccionar una influencer
+  (retrocompatible: semanas antiguas muestran "Sin foto guardada").
+
+⚠️ `Valentina` y `Martina` se crearon antes de este cambio: sus semanas no tienen fotos persistidas.
 
 **Lo que sigue (mejoras, no infraestructura):**
 - Mejoras de prompts y cerebro de Claude API
 - Mejoras de UX y componentes
 - Fase 5: publicación automática
 - Fase 6: KPIs y analytics
+- Autenticación: hoy la app no tiene login y cualquiera con el link consume créditos de pago
+- Dominio propio pendiente de comprar y conectar en Railway → Settings → Networking
