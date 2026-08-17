@@ -631,7 +631,6 @@ SUPABASE_BUCKET=zami-images
 | 4 | Perfil AI Persona | Anthropic `claude-sonnet-4-6` | ✅ Operativo |
 | Fase 4 | Contenido UGC — 2 semanas × 8 imágenes (1 clic) | Claude plan ×2 + ComfyDeploy `f9822b81` ×2 (14 slots, 8 usados) | ✅ Operativo |
 | Fase 4C | Botón "✦ Más Sexy" por foto — 10 imágenes | ComfyUI Cloud `cloud.comfy.org` + `data/workflow-sexy-contexto.json` | ✅ Operativo |
-| Fase 5 | Publicación automática | Por definir | ⏳ Pendiente |
 | Fase 6 | KPIs y analytics | Supabase | ⏳ Pendiente |
 
 ---
@@ -842,7 +841,6 @@ imagen que deba sobrevivir se copia al bucket propio antes de guardarse.
 **Lo que sigue (mejoras, no infraestructura):**
 - Mejoras de prompts y cerebro de Claude API
 - Mejoras de UX y componentes
-- Fase 5: publicación automática
 - Fase 6: KPIs y analytics
 - Autenticación: hoy la app no tiene login y cualquiera con el link consume créditos de pago
 - Dominio propio pendiente de comprar y conectar en Railway → Settings → Networking
