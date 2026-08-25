@@ -211,6 +211,8 @@ actualizaciones. Configurado mediante la variable `PERSISTENCE_DIR=/data`.
 Las fotos generadas **no** se guardan en Railway, sino en **Supabase Storage**, bucket
 `zami-images` (proyecto `qbffzmwedjekufsgutff`).
 
+Dashboard del proyecto: https://supabase.com/dashboard/project/qbffzmwedjekufsgutff
+
 **Por qué esto es importante:** ComfyDeploy y ComfyUI Cloud entregan las imágenes en URLs
 temporales de Amazon S3 que **expiran**. Si se guardaran así, las fotos aparecerían rotas
 al cabo de un tiempo.
